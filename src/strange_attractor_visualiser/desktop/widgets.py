@@ -46,7 +46,8 @@ FULL_DEBOUNCE_MS = 33
 PREVIEW_DEBOUNCE_MS = 0
 PREVIEW_POINT_BUDGET = 2_500
 PREVIEW_SOLVE_STEPS = 2_500
-PREVIEW_LINE_INTERPOLATION = 4
+LINE_INTERPOLATION = 4
+PREVIEW_LINE_INTERPOLATION = LINE_INTERPOLATION
 SOLVE_MODE_FULL = "full"
 SOLVE_MODE_PREVIEW = "preview"
 
@@ -487,6 +488,7 @@ class MainWindow:
             display_mode=self.display_mode_combo.currentText(),
             point_budget=POINT_BUDGETS[self.point_budget_combo.currentText()],
             use_density=self.density_toggle.isChecked(),
+            line_interpolation=LINE_INTERPOLATION,
         )
         if preview:
             return preview_display_settings(
