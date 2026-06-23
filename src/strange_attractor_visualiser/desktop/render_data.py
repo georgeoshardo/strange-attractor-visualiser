@@ -42,6 +42,20 @@ def downsample_solution(solution: np.ndarray, point_budget: int | None) -> np.nd
     return solution[indices]
 
 
+def preview_display_settings(
+    settings: DisplaySettings, point_budget: int
+) -> DisplaySettings:
+    if settings.point_budget is None:
+        preview_budget = point_budget
+    else:
+        preview_budget = min(settings.point_budget, point_budget)
+    return DisplaySettings(
+        display_mode=settings.display_mode,
+        point_budget=preview_budget,
+        use_density=False,
+    )
+
+
 def _mode_visibility(display_mode: str) -> tuple[bool, bool]:
     if display_mode == DISPLAY_MODE_LINES:
         return False, True

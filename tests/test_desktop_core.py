@@ -11,6 +11,7 @@ from strange_attractor_visualiser.desktop.render_data import (
     DisplaySettings,
     build_render_payload,
     downsample_solution,
+    preview_display_settings,
 )
 from strange_attractor_visualiser.desktop.state import parameter_cache_key
 from strange_attractor_visualiser.core.display import (
@@ -18,6 +19,7 @@ from strange_attractor_visualiser.core.display import (
     DISPLAY_MODE_LINES_POINTS,
     DISPLAY_MODE_POINTS,
 )
+from strange_attractor_visualiser.core.solver import get_default_params, solve_attractor
 
 
 def test_pyproject_defines_desktop_extra_and_qt_entrypoint():
@@ -58,6 +60,44 @@ def test_parameter_cache_key_uses_config_order_and_step_rounding():
     key = parameter_cache_key("Lorenz", config, values)
 
     assert key == ("Lorenz", (("$a$", 10.0), ("$b$", 28.01), ("$c$", 2.67)))
+
+
+def test_solve_attractor_accepts_step_count_override():
+    config = ATTRACTORS["Lorenz"]
+    params = get_default_params(config)
+
+    preview_solution = solve_attractor(config, params, n_steps=1234)
+    full_solution = solve_attractor(config, params)
+
+    assert preview_solution.shape == (1234, 3)
+    assert full_solution.shape == (config.time_defaults["n"], 3)
+
+
+def test_preview_display_settings_caps_points_and_disables_density():
+    settings = DisplaySettings(
+        display_mode=DISPLAY_MODE_LINES_POINTS,
+        point_budget=None,
+        use_density=True,
+    )
+
+    preview = preview_display_settings(settings, point_budget=2500)
+
+    assert preview.display_mode == DISPLAY_MODE_LINES_POINTS
+    assert preview.point_budget == 2500
+    assert preview.use_density is False
+
+
+def test_preview_display_settings_keeps_smaller_existing_budget():
+    settings = DisplaySettings(
+        display_mode=DISPLAY_MODE_POINTS,
+        point_budget=1000,
+        use_density=True,
+    )
+
+    preview = preview_display_settings(settings, point_budget=2500)
+
+    assert preview.point_budget == 1000
+    assert preview.use_density is False
 
 
 def test_format_equation_text_removes_streamlit_latex_for_qt_label():

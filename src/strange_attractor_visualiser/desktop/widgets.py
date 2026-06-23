@@ -13,7 +13,11 @@ from .controller import ResultCoordinator
 from .controls import FloatSliderSpec
 from .equations import format_equation_text
 from .render import AttractorView3D, ProjectionView
-from .render_data import DisplaySettings, build_render_payload
+from .render_data import (
+    DisplaySettings,
+    build_render_payload,
+    preview_display_settings,
+)
 from .state import parameter_cache_key
 
 POINT_BUDGETS = {
@@ -22,6 +26,12 @@ POINT_BUDGETS = {
     "Full source": None,
 }
 CACHE_MAX_ENTRIES = 128
+FULL_DEBOUNCE_MS = 33
+PREVIEW_DEBOUNCE_MS = 0
+PREVIEW_POINT_BUDGET = 2_500
+PREVIEW_SOLVE_STEPS = 2_500
+SOLVE_MODE_FULL = "full"
+SOLVE_MODE_PREVIEW = "preview"
 
 
 class ParameterSlider:
@@ -58,11 +68,21 @@ class ParameterSlider:
         layout.addWidget(self.name_label)
 
         self._callbacks = []
+        self._drag_started_callbacks = []
+        self._drag_finished_callbacks = []
         self.slider.valueChanged.connect(self._slider_changed)
+        self.slider.sliderPressed.connect(self._emit_drag_started)
+        self.slider.sliderReleased.connect(self._emit_drag_finished)
         self.spin.valueChanged.connect(self._spin_changed)
 
     def connect(self, callback) -> None:
         self._callbacks.append(callback)
+
+    def connect_drag_started(self, callback) -> None:
+        self._drag_started_callbacks.append(callback)
+
+    def connect_drag_finished(self, callback) -> None:
+        self._drag_finished_callbacks.append(callback)
 
     def value(self) -> float:
         return float(self.spin.value())
@@ -103,13 +123,21 @@ class ParameterSlider:
         for callback in self._callbacks:
             callback(self.param.name, value)
 
+    def _emit_drag_started(self) -> None:
+        for callback in self._drag_started_callbacks:
+            callback()
+
+    def _emit_drag_finished(self) -> None:
+        for callback in self._drag_finished_callbacks:
+            callback()
+
 
 class SolveSignals:
     def __init__(self):
         from PySide6 import QtCore
 
         class _Signals(QtCore.QObject):
-            finished = QtCore.Signal(int, object, object, dict, object)
+            finished = QtCore.Signal(int, object, object, dict, object, bool)
             failed = QtCore.Signal(int, object)
 
         self.object = _Signals()
@@ -123,6 +151,8 @@ class SolveWorker:
         param_values: dict[str, float],
         settings: DisplaySettings,
         cached_solution,
+        solve_steps: int | None,
+        preview: bool,
     ):
         from PySide6 import QtCore
 
@@ -136,9 +166,11 @@ class SolveWorker:
                     config = ATTRACTORS[selected_name]
                     solve_start = time.perf_counter()
                     solution = cached_solution
-                    cache_key = parameter_cache_key(selected_name, config, param_values)
+                    cache_key = None
+                    if not preview:
+                        cache_key = parameter_cache_key(selected_name, config, param_values)
                     if solution is None:
-                        solution = solve_attractor(config, param_values)
+                        solution = solve_attractor(config, param_values, n_steps=solve_steps)
                     solve_ms = (time.perf_counter() - solve_start) * 1000
 
                     render_start = time.perf_counter()
@@ -150,6 +182,7 @@ class SolveWorker:
                         payload,
                         {"solve_ms": solve_ms, "render_ms": render_ms},
                         cache_key,
+                        preview,
                     )
                 except Exception as exc:
                     inner_self.signals.failed.emit(generation, exc)
@@ -174,12 +207,15 @@ class MainWindow:
         self.current_solution = None
         self.animation_index = 0
         self.solve_in_progress = False
-        self.pending_solve = False
+        self.pending_solve_mode = None
+        self.queued_solve_mode = SOLVE_MODE_FULL
+        self.slider_drag_depth = 0
+        self.preview_render_active = False
         self.active_worker = None
 
         self.solve_timer = QtCore.QTimer()
         self.solve_timer.setSingleShot(True)
-        self.solve_timer.setInterval(33)
+        self.solve_timer.setInterval(FULL_DEBOUNCE_MS)
         self.solve_timer.timeout.connect(self.start_solve)
 
         self.animation_timer = QtCore.QTimer()
@@ -330,12 +366,15 @@ class MainWindow:
             """
         )
 
-    def current_settings(self) -> DisplaySettings:
-        return DisplaySettings(
+    def current_settings(self, preview: bool = False) -> DisplaySettings:
+        settings = DisplaySettings(
             display_mode=self.display_mode_combo.currentText(),
             point_budget=POINT_BUDGETS[self.point_budget_combo.currentText()],
             use_density=self.density_toggle.isChecked(),
         )
+        if preview:
+            return preview_display_settings(settings, PREVIEW_POINT_BUDGET)
+        return settings
 
     def rebuild_parameter_sliders(self):
         from PySide6 import QtWidgets
@@ -352,6 +391,8 @@ class MainWindow:
         for param in config.params:
             slider = ParameterSlider(param)
             slider.connect(self.parameter_changed)
+            slider.connect_drag_started(self.slider_drag_started)
+            slider.connect_drag_finished(self.slider_drag_finished)
             self.parameter_sliders[param.name] = slider
             self.parameter_layout.addWidget(slider.widget)
 
@@ -364,31 +405,69 @@ class MainWindow:
         self.param_values[name] = value
         self.animation_timer.stop()
         self.animate_toggle.setChecked(False)
-        self.schedule_solve()
+        self.update_status()
+        self.schedule_solve(preview=self.is_slider_dragging())
 
-    def schedule_solve(self, *_unused):
-        self.solve_timer.start()
+    def slider_drag_started(self) -> None:
+        self.slider_drag_depth += 1
+        self.animation_timer.stop()
+        self.animate_toggle.setChecked(False)
+        self.update_status()
+
+    def slider_drag_finished(self) -> None:
+        self.slider_drag_depth = max(0, self.slider_drag_depth - 1)
+        if not self.is_slider_dragging():
+            self.schedule_solve(preview=False, delay_ms=0)
+            self.update_status()
+
+    def is_slider_dragging(self) -> bool:
+        return self.slider_drag_depth > 0
+
+    def schedule_solve(
+        self,
+        *_unused,
+        preview: bool | None = None,
+        delay_ms: int | None = None,
+    ):
+        if preview is None:
+            preview = self.is_slider_dragging()
+        requested_mode = SOLVE_MODE_PREVIEW if preview else SOLVE_MODE_FULL
+        self.queued_solve_mode = requested_mode
+        if delay_ms is None:
+            delay_ms = (
+                PREVIEW_DEBOUNCE_MS
+                if self.queued_solve_mode == SOLVE_MODE_PREVIEW
+                else FULL_DEBOUNCE_MS
+            )
+        self.solve_timer.start(delay_ms)
 
     def start_solve(self):
+        solve_mode = self.queued_solve_mode
+        self.queued_solve_mode = SOLVE_MODE_FULL
         if self.solve_in_progress:
-            self.pending_solve = True
+            self.pending_solve_mode = solve_mode
             self.coordinator.next_generation()
             return
 
+        preview = solve_mode == SOLVE_MODE_PREVIEW
         selected_name = self.selected_name
         config = ATTRACTORS[selected_name]
         param_values = dict(self.param_values)
-        cache_key = parameter_cache_key(selected_name, config, param_values)
-        cached_solution = self.solution_cache.get(cache_key)
-        if cached_solution is not None:
-            self.solution_cache.move_to_end(cache_key)
+        cached_solution = None
+        if not preview:
+            cache_key = parameter_cache_key(selected_name, config, param_values)
+            cached_solution = self.solution_cache.get(cache_key)
+            if cached_solution is not None:
+                self.solution_cache.move_to_end(cache_key)
         generation = self.coordinator.next_generation()
         worker = SolveWorker(
             generation,
             selected_name,
             param_values,
-            self.current_settings(),
+            self.current_settings(preview=preview),
             cached_solution,
+            PREVIEW_SOLVE_STEPS if preview else None,
+            preview,
         )
         worker.signals.finished.connect(self.solve_finished)
         worker.signals.failed.connect(self.solve_failed)
@@ -396,16 +475,19 @@ class MainWindow:
         self.solve_in_progress = True
         self.thread_pool.start(worker.runnable)
 
-    def solve_finished(self, generation, solution, payload, timings, cache_key):
+    def solve_finished(self, generation, solution, payload, timings, cache_key, preview):
         self.solve_in_progress = False
         self.active_worker = None
-        self.solution_cache[cache_key] = solution
-        self.solution_cache.move_to_end(cache_key)
-        while len(self.solution_cache) > CACHE_MAX_ENTRIES:
-            self.solution_cache.popitem(last=False)
+        if cache_key is not None:
+            self.solution_cache[cache_key] = solution
+            self.solution_cache.move_to_end(cache_key)
+            while len(self.solution_cache) > CACHE_MAX_ENTRIES:
+                self.solution_cache.popitem(last=False)
         accepted = self.coordinator.accept_success(generation, payload, timings)
         if accepted:
-            self.current_solution = solution
+            if not preview:
+                self.current_solution = solution
+            self.preview_render_active = preview
             self.apply_payload(payload)
             self.update_status()
         self._run_pending_solve()
@@ -418,8 +500,9 @@ class MainWindow:
         self._run_pending_solve()
 
     def _run_pending_solve(self):
-        if self.pending_solve:
-            self.pending_solve = False
+        if self.pending_solve_mode is not None:
+            self.queued_solve_mode = self.pending_solve_mode
+            self.pending_solve_mode = None
             self.solve_timer.start(0)
 
     def apply_payload(self, payload):
@@ -441,6 +524,8 @@ class MainWindow:
                 for name, value in self.param_values.items()
             ),
         ]
+        if self.is_slider_dragging() or self.preview_render_active:
+            parts.append("Preview: low resolution; full render pending")
         if self.coordinator.status.error:
             parts.append(f"Error: {self.coordinator.status.error}")
         elif self.performance_toggle.isChecked():

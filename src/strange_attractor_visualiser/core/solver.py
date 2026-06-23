@@ -5,10 +5,12 @@ from .models import AttractorConfig
 
 
 def solve_attractor(
-    config: AttractorConfig, param_values: dict[str, float]
+    config: AttractorConfig,
+    param_values: dict[str, float],
+    n_steps: int | None = None,
 ) -> np.ndarray:
     t_def = config.time_defaults
-    t = np.linspace(t_def["t_min"], t_def["t_max"], t_def["n"])
+    t = np.linspace(t_def["t_min"], t_def["t_max"], n_steps or t_def["n"])
 
     args = tuple(param_values[p.name] for p in config.params)
 

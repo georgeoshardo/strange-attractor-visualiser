@@ -43,3 +43,33 @@ def test_desktop_main_window_schedules_solve_on_slider_change():
     assert window.coordinator.last_payload is not None
     window.window.close()
     app.processEvents()
+
+
+def test_desktop_main_window_uses_preview_solves_during_slider_drag():
+    from PySide6 import QtWidgets
+
+    from strange_attractor_visualiser.desktop.widgets import (
+        PREVIEW_DEBOUNCE_MS,
+        SOLVE_MODE_FULL,
+        SOLVE_MODE_PREVIEW,
+        MainWindow,
+    )
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    window = MainWindow()
+    window.solve_timer.stop()
+
+    window.density_toggle.setChecked(True)
+    window.solve_timer.stop()
+    window.slider_drag_started()
+    window.parameter_changed("$a$", 12.34)
+
+    assert window.queued_solve_mode == SOLVE_MODE_PREVIEW
+    assert window.solve_timer.interval() == PREVIEW_DEBOUNCE_MS
+    assert window.current_settings(preview=True).use_density is False
+
+    window.slider_drag_finished()
+
+    assert window.queued_solve_mode == SOLVE_MODE_FULL
+    window.window.close()
+    app.processEvents()
