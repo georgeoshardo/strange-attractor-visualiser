@@ -11,6 +11,7 @@ from ..core.display import (
     DISPLAY_MODE_POINTS,
 )
 from ..core.solver import (
+    AdaptiveHorizonSettings,
     SOLVER_LSODA,
     SOLVER_RK4,
     SolverSettings,
@@ -169,6 +170,7 @@ class SolveWorker:
         cached_solution,
         solve_steps: int | None,
         solver_settings: SolverSettings,
+        sampling_settings: AdaptiveHorizonSettings,
         preview: bool,
     ):
         from PySide6 import QtCore
@@ -190,6 +192,7 @@ class SolveWorker:
                             config,
                             param_values,
                             solver_settings,
+                            sampling_settings,
                         )
                     if solution is None:
                         solution = solve_attractor(
@@ -197,6 +200,7 @@ class SolveWorker:
                             param_values,
                             n_steps=solve_steps,
                             solver_settings=solver_settings,
+                            adaptive_settings=sampling_settings,
                         )
                     solve_ms = (time.perf_counter() - solve_start) * 1000
 
@@ -367,6 +371,74 @@ class MainWindow:
         self.lsoda_tolerance_combo.currentTextChanged.connect(self.schedule_solve)
         layout.addWidget(self.lsoda_tolerance_combo)
 
+        sampling_group = QtWidgets.QGroupBox("Sampling")
+        sampling_layout = QtWidgets.QFormLayout(sampling_group)
+        self.adaptive_horizon_toggle = QtWidgets.QCheckBox("Adaptive horizon")
+        self.adaptive_horizon_toggle.setChecked(True)
+        sampling_layout.addRow(self.adaptive_horizon_toggle)
+
+        self.burn_in_spin = QtWidgets.QDoubleSpinBox()
+        self.burn_in_spin.setRange(0.0, 80.0)
+        self.burn_in_spin.setSingleStep(5.0)
+        self.burn_in_spin.setDecimals(0)
+        self.burn_in_spin.setSuffix(" %")
+        self.burn_in_spin.setValue(10.0)
+        sampling_layout.addRow("Burn-in", self.burn_in_spin)
+
+        self.batch_steps_spin = QtWidgets.QSpinBox()
+        self.batch_steps_spin.setRange(500, 50_000)
+        self.batch_steps_spin.setSingleStep(500)
+        self.batch_steps_spin.setValue(5_000)
+        sampling_layout.addRow("Batch points", self.batch_steps_spin)
+
+        self.max_points_spin = QtWidgets.QSpinBox()
+        self.max_points_spin.setRange(1_000, 300_000)
+        self.max_points_spin.setSingleStep(5_000)
+        self.max_points_spin.setValue(60_000)
+        sampling_layout.addRow("Max points", self.max_points_spin)
+
+        self.bounds_tolerance_spin = QtWidgets.QDoubleSpinBox()
+        self.bounds_tolerance_spin.setRange(0.1, 20.0)
+        self.bounds_tolerance_spin.setSingleStep(0.5)
+        self.bounds_tolerance_spin.setDecimals(1)
+        self.bounds_tolerance_spin.setSuffix(" %")
+        self.bounds_tolerance_spin.setValue(2.0)
+        sampling_layout.addRow("Bounds tol", self.bounds_tolerance_spin)
+
+        self.coverage_tolerance_spin = QtWidgets.QDoubleSpinBox()
+        self.coverage_tolerance_spin.setRange(0.1, 20.0)
+        self.coverage_tolerance_spin.setSingleStep(0.5)
+        self.coverage_tolerance_spin.setDecimals(1)
+        self.coverage_tolerance_spin.setSuffix(" %")
+        self.coverage_tolerance_spin.setValue(1.0)
+        sampling_layout.addRow("Coverage tol", self.coverage_tolerance_spin)
+
+        self.stable_batches_spin = QtWidgets.QSpinBox()
+        self.stable_batches_spin.setRange(1, 10)
+        self.stable_batches_spin.setSingleStep(1)
+        self.stable_batches_spin.setValue(2)
+        sampling_layout.addRow("Stable batches", self.stable_batches_spin)
+
+        self.coverage_bins_spin = QtWidgets.QSpinBox()
+        self.coverage_bins_spin.setRange(8, 64)
+        self.coverage_bins_spin.setSingleStep(8)
+        self.coverage_bins_spin.setValue(32)
+        sampling_layout.addRow("Coverage bins", self.coverage_bins_spin)
+
+        self.adaptive_controls = [
+            self.burn_in_spin,
+            self.batch_steps_spin,
+            self.max_points_spin,
+            self.bounds_tolerance_spin,
+            self.coverage_tolerance_spin,
+            self.stable_batches_spin,
+            self.coverage_bins_spin,
+        ]
+        self.adaptive_horizon_toggle.toggled.connect(self.sampling_settings_changed)
+        for control in self.adaptive_controls:
+            control.valueChanged.connect(self.schedule_solve)
+        layout.addWidget(sampling_group)
+
         self.performance_toggle = QtWidgets.QCheckBox("Show performance")
         self.performance_toggle.toggled.connect(self.update_status)
         layout.addWidget(self.performance_toggle)
@@ -433,10 +505,29 @@ class MainWindow:
             lsoda_atol=atol,
         )
 
+    def current_sampling_settings(self, preview: bool = False) -> AdaptiveHorizonSettings:
+        if preview:
+            return AdaptiveHorizonSettings(enabled=False)
+        return AdaptiveHorizonSettings(
+            enabled=self.adaptive_horizon_toggle.isChecked(),
+            burn_in_fraction=self.burn_in_spin.value() / 100.0,
+            batch_steps=self.batch_steps_spin.value(),
+            max_points=self.max_points_spin.value(),
+            stable_batches=self.stable_batches_spin.value(),
+            bounds_tolerance=self.bounds_tolerance_spin.value() / 100.0,
+            coverage_tolerance=self.coverage_tolerance_spin.value() / 100.0,
+            coverage_bins=self.coverage_bins_spin.value(),
+        )
+
     def integrator_changed(self, *_unused) -> None:
         self.lsoda_tolerance_combo.setEnabled(
             self.integrator_combo.currentText() == SOLVER_LSODA
         )
+        self.schedule_solve()
+
+    def sampling_settings_changed(self, enabled: bool) -> None:
+        for control in self.adaptive_controls:
+            control.setEnabled(enabled)
         self.schedule_solve()
 
     def rebuild_parameter_sliders(self):
@@ -517,6 +608,7 @@ class MainWindow:
         config = ATTRACTORS[selected_name]
         param_values = dict(self.param_values)
         solver_settings = self.current_solver_settings()
+        sampling_settings = self.current_sampling_settings(preview=preview)
         cached_solution = None
         if not preview:
             cache_key = parameter_cache_key(
@@ -524,6 +616,7 @@ class MainWindow:
                 config,
                 param_values,
                 solver_settings,
+                sampling_settings,
             )
             cached_solution = self.solution_cache.get(cache_key)
             if cached_solution is not None:
@@ -537,6 +630,7 @@ class MainWindow:
             cached_solution,
             PREVIEW_SOLVE_STEPS if preview else None,
             solver_settings,
+            sampling_settings,
             preview,
         )
         worker.signals.finished.connect(self.solve_finished)
@@ -611,6 +705,15 @@ class MainWindow:
             parts.append("Integrator: RK4")
         else:
             parts.append(f"Integrator: LSODA {self.lsoda_tolerance_combo.currentText()}")
+        sampling_settings = self.current_sampling_settings(preview=False)
+        if sampling_settings.enabled:
+            parts.append(
+                "Sampling: adaptive "
+                f"burn-in {self.burn_in_spin.value():.0f}%, "
+                f"max {sampling_settings.max_points}"
+            )
+        else:
+            parts.append("Sampling: fixed horizon")
         self.system_label.setText(format_equation_text(config.equation_text))
         self.status_label.setText("\n".join(parts))
 

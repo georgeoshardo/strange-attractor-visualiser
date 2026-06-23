@@ -17,14 +17,19 @@ def parameter_cache_key(
     config: AttractorConfig,
     param_values: dict[str, float],
     solver_settings: SolverSettings | None = None,
+    sampling_settings=None,
 ) -> tuple:
     items = []
     for param in config.params:
         decimals = _decimal_places(param.step)
         items.append((param.name, round(float(param_values[param.name]), decimals)))
+    key = [selected_name, tuple(items)]
     if solver_settings is None:
-        return selected_name, tuple(items)
-    return selected_name, tuple(items), ("solver", solver_settings.cache_key())
+        return tuple(key)
+    key.append(("solver", solver_settings.cache_key()))
+    if sampling_settings is not None:
+        key.append(("sampling", sampling_settings.cache_key()))
+    return tuple(key)
 
 
 @dataclass

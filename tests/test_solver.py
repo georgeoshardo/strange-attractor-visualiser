@@ -3,6 +3,7 @@ import pytest
 
 from strange_attractor_visualiser.attractors.registry import ATTRACTORS
 from strange_attractor_visualiser.core.solver import (
+    AdaptiveHorizonSettings,
     SOLVER_LSODA,
     SOLVER_RK4,
     SolverSettings,
@@ -50,6 +51,54 @@ def test_solver_accepts_lsoda_tolerances():
     )
 
     assert sol.shape == (config.time_defaults["n"], 3)
+    assert np.isfinite(sol).all()
+
+
+def test_adaptive_solver_discards_burn_in_and_respects_max_points():
+    config = ATTRACTORS["Lorenz"]
+    params = get_default_params(config)
+
+    sol = solve_attractor(
+        config,
+        params,
+        n_steps=100,
+        adaptive_settings=AdaptiveHorizonSettings(
+            enabled=True,
+            burn_in_fraction=0.2,
+            batch_steps=10,
+            max_points=25,
+            min_batches=10,
+            stable_batches=10,
+        ),
+    )
+
+    assert sol.shape == (25, 3)
+    assert np.isfinite(sol).all()
+    assert not np.allclose(sol[0], config.initial_conditions)
+
+
+def test_adaptive_solver_can_stop_when_bounds_and_coverage_stabilise():
+    config = ATTRACTORS["Lorenz"]
+    params = get_default_params(config)
+
+    sol = solve_attractor(
+        config,
+        params,
+        n_steps=100,
+        adaptive_settings=AdaptiveHorizonSettings(
+            enabled=True,
+            burn_in_fraction=0.0,
+            batch_steps=10,
+            max_points=80,
+            min_batches=2,
+            stable_batches=1,
+            bounds_tolerance=1e6,
+            coverage_tolerance=1e6,
+            coverage_bins=8,
+        ),
+    )
+
+    assert sol.shape == (20, 3)
     assert np.isfinite(sol).all()
 
 

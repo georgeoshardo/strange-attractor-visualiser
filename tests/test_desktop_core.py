@@ -22,6 +22,7 @@ from strange_attractor_visualiser.core.display import (
     DISPLAY_MODE_POINTS,
 )
 from strange_attractor_visualiser.core.solver import (
+    AdaptiveHorizonSettings,
     SOLVER_LSODA,
     SOLVER_RK4,
     SolverSettings,
@@ -90,6 +91,30 @@ def test_parameter_cache_key_includes_solver_settings_when_supplied():
     assert lsoda_key != rk4_key
     assert lsoda_key[-1] == ("solver", ("LSODA", 1e-06, 1e-08))
     assert rk4_key[-1] == ("solver", ("RK4", None, None))
+
+
+def test_parameter_cache_key_includes_adaptive_sampling_settings():
+    config = ATTRACTORS["Lorenz"]
+    values = get_default_params(config)
+    solver_settings = SolverSettings(method=SOLVER_RK4)
+
+    short_key = parameter_cache_key(
+        "Lorenz",
+        config,
+        values,
+        solver_settings,
+        AdaptiveHorizonSettings(enabled=True, max_points=20_000),
+    )
+    long_key = parameter_cache_key(
+        "Lorenz",
+        config,
+        values,
+        solver_settings,
+        AdaptiveHorizonSettings(enabled=True, max_points=80_000),
+    )
+
+    assert short_key != long_key
+    assert short_key[-1][0] == "sampling"
 
 
 def test_desktop_display_defaults_to_lines_with_density():
