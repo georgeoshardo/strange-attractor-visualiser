@@ -374,7 +374,7 @@ class MainWindow:
         sampling_group = QtWidgets.QGroupBox("Sampling")
         sampling_layout = QtWidgets.QFormLayout(sampling_group)
         self.adaptive_horizon_toggle = QtWidgets.QCheckBox("Adaptive horizon")
-        self.adaptive_horizon_toggle.setChecked(True)
+        self.adaptive_horizon_toggle.setChecked(False)
         sampling_layout.addRow(self.adaptive_horizon_toggle)
 
         self.burn_in_spin = QtWidgets.QDoubleSpinBox()
@@ -382,7 +382,7 @@ class MainWindow:
         self.burn_in_spin.setSingleStep(5.0)
         self.burn_in_spin.setDecimals(0)
         self.burn_in_spin.setSuffix(" %")
-        self.burn_in_spin.setValue(10.0)
+        self.burn_in_spin.setValue(0.0)
         sampling_layout.addRow("Burn-in", self.burn_in_spin)
 
         self.batch_steps_spin = QtWidgets.QSpinBox()
@@ -434,6 +434,8 @@ class MainWindow:
             self.stable_batches_spin,
             self.coverage_bins_spin,
         ]
+        for control in self.adaptive_controls:
+            control.setEnabled(False)
         self.adaptive_horizon_toggle.toggled.connect(self.sampling_settings_changed)
         for control in self.adaptive_controls:
             control.valueChanged.connect(self.schedule_solve)

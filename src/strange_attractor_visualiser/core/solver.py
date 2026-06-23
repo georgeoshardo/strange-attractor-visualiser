@@ -24,7 +24,7 @@ class SolverSettings:
 @dataclass(frozen=True)
 class AdaptiveHorizonSettings:
     enabled: bool = False
-    burn_in_fraction: float = 0.1
+    burn_in_fraction: float = 0.0
     batch_steps: int = 5_000
     max_points: int = 60_000
     min_batches: int = 3

@@ -14,6 +14,7 @@ from ..core.display import (
 CAMERA_DISTANCE_SCALE = 2.2
 GRID_PADDING = 1.25
 MIN_VIEW_SPAN = 1.0
+MAX_RENDER_COORD = 1_000_000.0
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,16 @@ def downsample_solution(solution: np.ndarray, point_budget: int | None) -> np.nd
     return solution[indices]
 
 
+def _renderable_positions(solution: np.ndarray) -> np.ndarray:
+    positions = np.asarray(solution, dtype=float)
+    if positions.ndim != 2 or positions.shape[1] != 3:
+        return np.empty((0, 3), dtype=np.float32)
+
+    finite = np.isfinite(positions).all(axis=1)
+    bounded = np.max(np.abs(positions), axis=1) <= MAX_RENDER_COORD
+    return positions[finite & bounded].astype(np.float32)
+
+
 def _nice_grid_spacing(raw_spacing: float) -> float:
     if raw_spacing <= 0.0 or not math.isfinite(raw_spacing):
         return 1.0
@@ -84,11 +95,7 @@ def _nice_grid_spacing(raw_spacing: float) -> float:
 
 
 def calculate_view_bounds(positions: np.ndarray) -> ViewBounds:
-    positions = np.asarray(positions, dtype=np.float32)
-    if positions.size == 0:
-        finite_positions = np.empty((0, 3), dtype=np.float32)
-    else:
-        finite_positions = positions[np.isfinite(positions).all(axis=1)]
+    finite_positions = _renderable_positions(positions)
 
     if len(finite_positions) == 0:
         minimum = np.zeros(3, dtype=np.float32)
@@ -211,8 +218,9 @@ def _linear_interpolate(values: np.ndarray, factor: int) -> np.ndarray:
 def build_render_payload(
     solution: np.ndarray, settings: DisplaySettings
 ) -> RenderPayload:
-    view_bounds = calculate_view_bounds(solution)
-    sampled = downsample_solution(solution, settings.point_budget)
+    renderable_solution = _renderable_positions(solution)
+    view_bounds = calculate_view_bounds(renderable_solution)
+    sampled = downsample_solution(renderable_solution, settings.point_budget)
     positions = np.asarray(sampled, dtype=np.float32)
     show_points, show_lines = _mode_visibility(settings.display_mode)
 

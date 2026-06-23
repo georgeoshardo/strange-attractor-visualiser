@@ -159,20 +159,21 @@ def test_desktop_main_window_exposes_adaptive_sampling_controls():
 
     settings = window.current_sampling_settings()
 
-    assert settings.enabled is True
-    assert settings.burn_in_fraction == 0.1
+    assert settings.enabled is False
+    assert settings.burn_in_fraction == 0.0
     assert settings.batch_steps == 5_000
     assert settings.max_points == 60_000
     assert settings.stable_batches == 2
     assert settings.bounds_tolerance == 0.02
     assert settings.coverage_tolerance == 0.01
     assert settings.coverage_bins == 32
+    assert not window.burn_in_spin.isEnabled()
     assert window.current_sampling_settings(preview=True).enabled is False
 
-    window.adaptive_horizon_toggle.setChecked(False)
+    window.adaptive_horizon_toggle.setChecked(True)
 
-    assert window.current_sampling_settings().enabled is False
-    assert not window.burn_in_spin.isEnabled()
+    assert window.current_sampling_settings().enabled is True
+    assert window.burn_in_spin.isEnabled()
     assert window.solve_timer.isActive()
     window.window.close()
     app.processEvents()

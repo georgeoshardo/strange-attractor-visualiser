@@ -251,6 +251,32 @@ def test_build_render_payload_bounds_use_full_curve_before_downsampling():
     assert np.allclose(payload.view_bounds.maximum, [500.0, 2.0, 2.0])
 
 
+def test_build_render_payload_filters_unrenderable_overflow_values():
+    solution = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0e300, 1.0e300, 1.0e300],
+            [np.nan, 2.0, 3.0],
+            [1.0, 1.0, 1.0],
+        ]
+    )
+    settings = DisplaySettings(
+        display_mode=DISPLAY_MODE_LINES,
+        point_budget=None,
+        use_density=False,
+        line_interpolation=4,
+    )
+
+    payload = build_render_payload(solution, settings)
+
+    assert payload.positions.shape == (2, 3)
+    assert np.isfinite(payload.positions).all()
+    assert np.isfinite(payload.line_positions).all()
+    assert np.isfinite(payload.view_bounds.center).all()
+    assert np.isfinite(payload.view_bounds.grid_size)
+    assert payload.view_bounds.grid_size < 10.0
+
+
 def test_build_render_payload_for_points_only():
     solution = np.column_stack([np.arange(20), np.arange(20) + 1, np.arange(20) + 2])
     settings = DisplaySettings(
