@@ -23,6 +23,7 @@ class ProjectionPayload:
     y: np.ndarray
     show_points: bool
     show_lines: bool
+    line_colors: np.ndarray | None = None
 
 
 @dataclass(frozen=True)
@@ -31,7 +32,7 @@ class RenderPayload:
     show_points: bool
     show_lines: bool
     point_colors: np.ndarray | None
-    line_color: tuple[float, float, float, float]
+    line_colors: np.ndarray | tuple[float, float, float, float]
     projections: dict[str, ProjectionPayload]
 
 
@@ -52,7 +53,7 @@ def preview_display_settings(
     return DisplaySettings(
         display_mode=settings.display_mode,
         point_budget=preview_budget,
-        use_density=False,
+        use_density=settings.use_density,
     )
 
 
@@ -71,25 +72,31 @@ def _constant_point_colours(n_points: int) -> np.ndarray:
     return colours
 
 
-def _density_point_colours(positions: np.ndarray) -> np.ndarray:
-    if len(positions) < 3:
-        return _constant_point_colours(len(positions))
+def _density_colours(x: np.ndarray, y: np.ndarray, alpha: float = 0.78) -> np.ndarray:
+    if len(x) < 3:
+        colours = _constant_point_colours(len(x))
+        colours[:, 3] = alpha
+        return colours
 
-    sample_size = min(1000, len(positions))
-    indices = np.linspace(0, len(positions) - 1, sample_size, dtype=int)
-    kde = gaussian_kde(np.vstack([positions[indices, 0], positions[indices, 1]]))
-    density = kde(np.vstack([positions[:, 0], positions[:, 1]]))
+    sample_size = min(1000, len(x))
+    indices = np.linspace(0, len(x) - 1, sample_size, dtype=int)
+    kde = gaussian_kde(np.vstack([x[indices], y[indices]]))
+    density = kde(np.vstack([x, y]))
     density = density - np.min(density)
     max_density = float(np.max(density))
     if max_density > 0:
         density = density / max_density
 
-    colours = np.empty((len(positions), 4), dtype=np.float32)
+    colours = np.empty((len(x), 4), dtype=np.float32)
     colours[:, 0] = density
     colours[:, 1] = 0.35 + 0.55 * (1.0 - density)
     colours[:, 2] = 1.0 - density
-    colours[:, 3] = 0.78
+    colours[:, 3] = alpha
     return colours
+
+
+def _density_position_colours(positions: np.ndarray, alpha: float = 0.78) -> np.ndarray:
+    return _density_colours(positions[:, 0], positions[:, 1], alpha=alpha)
 
 
 def build_render_payload(
@@ -99,27 +106,55 @@ def build_render_payload(
     positions = np.asarray(sampled, dtype=np.float32)
     show_points, show_lines = _mode_visibility(settings.display_mode)
 
+    density_colors = None
+    if settings.use_density and (show_points or show_lines):
+        density_colors = _density_position_colours(positions)
+
     point_colors = None
     if show_points:
-        if settings.use_density:
-            point_colors = _density_point_colours(positions)
+        if density_colors is not None:
+            point_colors = density_colors
         else:
             point_colors = _constant_point_colours(len(positions))
+
+    if show_lines and density_colors is not None:
+        line_colors = density_colors
+    else:
+        line_colors = (0.93, 0.93, 0.93, 0.38)
 
     projection_show_points = settings.display_mode != DISPLAY_MODE_LINES
     projection_show_lines = settings.display_mode in (
         DISPLAY_MODE_LINES,
         DISPLAY_MODE_LINES_POINTS,
     )
+    projection_line_colors = {}
+    if projection_show_lines and settings.use_density:
+        projection_line_colors = {
+            "x-y": density_colors,
+            "x-z": _density_colours(positions[:, 0], positions[:, 2]),
+            "y-z": _density_colours(positions[:, 1], positions[:, 2]),
+        }
     projections = {
         "x-y": ProjectionPayload(
-            positions[:, 0], positions[:, 1], projection_show_points, projection_show_lines
+            positions[:, 0],
+            positions[:, 1],
+            projection_show_points,
+            projection_show_lines,
+            projection_line_colors.get("x-y"),
         ),
         "x-z": ProjectionPayload(
-            positions[:, 0], positions[:, 2], projection_show_points, projection_show_lines
+            positions[:, 0],
+            positions[:, 2],
+            projection_show_points,
+            projection_show_lines,
+            projection_line_colors.get("x-z"),
         ),
         "y-z": ProjectionPayload(
-            positions[:, 1], positions[:, 2], projection_show_points, projection_show_lines
+            positions[:, 1],
+            positions[:, 2],
+            projection_show_points,
+            projection_show_lines,
+            projection_line_colors.get("y-z"),
         ),
     }
 
@@ -128,6 +163,6 @@ def build_render_payload(
         show_points=show_points,
         show_lines=show_lines,
         point_colors=point_colors,
-        line_color=(0.93, 0.93, 0.93, 0.38),
+        line_colors=line_colors,
         projections=projections,
     )

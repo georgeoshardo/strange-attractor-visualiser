@@ -66,10 +66,37 @@ def test_desktop_main_window_uses_preview_solves_during_slider_drag():
 
     assert window.queued_solve_mode == SOLVE_MODE_PREVIEW
     assert window.solve_timer.interval() == PREVIEW_DEBOUNCE_MS
-    assert window.current_settings(preview=True).use_density is False
+    assert window.current_settings(preview=True).use_density is True
 
     window.slider_drag_finished()
 
     assert window.queued_solve_mode == SOLVE_MODE_FULL
     window.window.close()
+    app.processEvents()
+
+
+def test_projection_view_accepts_density_coloured_lines():
+    import numpy as np
+    from PySide6 import QtWidgets
+
+    from strange_attractor_visualiser.desktop.render import ProjectionView
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    projection = ProjectionView("x-y")
+    x = np.linspace(0, 1, 8)
+    y = np.sin(x)
+    colors = np.ones((8, 4), dtype=np.float32)
+    colors[:, 0] = np.linspace(0, 1, 8)
+    colors[:, 1] = np.linspace(1, 0, 8)
+
+    projection.set_data(
+        x,
+        y,
+        show_points=False,
+        show_lines=True,
+        line_colors=colors,
+    )
+
+    assert projection.colored_line_item.picture is not None
+    projection.widget.close()
     app.processEvents()

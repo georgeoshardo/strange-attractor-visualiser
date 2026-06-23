@@ -67,7 +67,7 @@ class AttractorView3D:
         if payload.show_lines:
             self.line.setData(
                 pos=payload.positions,
-                color=payload.line_color,
+                color=payload.line_colors,
                 width=1.0,
                 mode="line_strip",
             )
@@ -79,8 +79,73 @@ class AttractorView3D:
 
 class ProjectionView:
     def __init__(self, title: str):
-        from PySide6 import QtWidgets
+        from PySide6 import QtCore, QtGui, QtWidgets
         import pyqtgraph as pg
+
+        class _ColoredLineItem(pg.GraphicsObject):
+            def __init__(self):
+                super().__init__()
+                self.picture = None
+                self._bounds = QtCore.QRectF()
+
+            def setData(
+                self,
+                x: np.ndarray,
+                y: np.ndarray,
+                colors: np.ndarray,
+            ) -> None:
+                self.prepareGeometryChange()
+                if len(x) < 2:
+                    self.picture = None
+                    self._bounds = QtCore.QRectF()
+                    self.update()
+                    return
+
+                x = np.asarray(x, dtype=float)
+                y = np.asarray(y, dtype=float)
+                colors = np.asarray(colors, dtype=float)
+                self._bounds = QtCore.QRectF(
+                    float(np.min(x)),
+                    float(np.min(y)),
+                    float(np.max(x) - np.min(x)),
+                    float(np.max(y) - np.min(y)),
+                )
+
+                picture = QtGui.QPicture()
+                painter = QtGui.QPainter(picture)
+                pen = QtGui.QPen()
+                pen.setWidthF(1.0)
+                for index in range(len(x) - 1):
+                    r, g, b, a = colors[index]
+                    pen.setColor(
+                        QtGui.QColor.fromRgbF(
+                            float(r),
+                            float(g),
+                            float(b),
+                            float(a),
+                        )
+                    )
+                    painter.setPen(pen)
+                    painter.drawLine(
+                        QtCore.QPointF(float(x[index]), float(y[index])),
+                        QtCore.QPointF(float(x[index + 1]), float(y[index + 1])),
+                    )
+                painter.end()
+                self.picture = picture
+                self.update()
+
+            def clear(self) -> None:
+                self.prepareGeometryChange()
+                self.picture = None
+                self._bounds = QtCore.QRectF()
+                self.update()
+
+            def paint(self, painter, *_args) -> None:
+                if self.picture is not None:
+                    self.picture.play(painter)
+
+            def boundingRect(self):
+                return self._bounds
 
         self.widget = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(self.widget)
@@ -102,6 +167,7 @@ class ProjectionView:
         self.line_item = pg.PlotDataItem(
             pen=pg.mkPen((238, 238, 238, 140), width=1)
         )
+        self.colored_line_item = _ColoredLineItem()
         self.point_item = pg.PlotDataItem(
             pen=None,
             symbol="o",
@@ -109,6 +175,7 @@ class ProjectionView:
             symbolBrush=pg.mkBrush(238, 238, 238, 190),
         )
         self.plot.addItem(self.line_item)
+        self.plot.addItem(self.colored_line_item)
         self.plot.addItem(self.point_item)
 
     def set_data(
@@ -117,11 +184,18 @@ class ProjectionView:
         y: np.ndarray,
         show_points: bool,
         show_lines: bool,
+        line_colors: np.ndarray | None = None,
     ) -> None:
         if show_lines:
-            self.line_item.setData(x, y)
+            if line_colors is not None:
+                self.line_item.clear()
+                self.colored_line_item.setData(x, y, line_colors)
+            else:
+                self.colored_line_item.clear()
+                self.line_item.setData(x, y)
         else:
             self.line_item.clear()
+            self.colored_line_item.clear()
 
         if show_points:
             self.point_item.setData(x, y)

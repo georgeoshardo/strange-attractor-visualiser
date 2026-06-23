@@ -513,6 +513,7 @@ class MainWindow:
                 projection.y,
                 projection.show_points,
                 projection.show_lines,
+                projection.line_colors,
             )
 
     def update_status(self, *_unused):

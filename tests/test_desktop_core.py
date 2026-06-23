@@ -73,7 +73,7 @@ def test_solve_attractor_accepts_step_count_override():
     assert full_solution.shape == (config.time_defaults["n"], 3)
 
 
-def test_preview_display_settings_caps_points_and_disables_density():
+def test_preview_display_settings_caps_points_and_keeps_density():
     settings = DisplaySettings(
         display_mode=DISPLAY_MODE_LINES_POINTS,
         point_budget=None,
@@ -84,10 +84,10 @@ def test_preview_display_settings_caps_points_and_disables_density():
 
     assert preview.display_mode == DISPLAY_MODE_LINES_POINTS
     assert preview.point_budget == 2500
-    assert preview.use_density is False
+    assert preview.use_density is True
 
 
-def test_preview_display_settings_keeps_smaller_existing_budget():
+def test_preview_display_settings_keeps_smaller_existing_budget_and_density():
     settings = DisplaySettings(
         display_mode=DISPLAY_MODE_POINTS,
         point_budget=1000,
@@ -97,7 +97,7 @@ def test_preview_display_settings_keeps_smaller_existing_budget():
     preview = preview_display_settings(settings, point_budget=2500)
 
     assert preview.point_budget == 1000
-    assert preview.use_density is False
+    assert preview.use_density is True
 
 
 def test_format_equation_text_removes_streamlit_latex_for_qt_label():
@@ -164,7 +164,7 @@ def test_build_render_payload_for_lines_with_points():
     assert payload.projections["x-z"].show_lines is True
 
 
-def test_build_render_payload_disables_density_for_lines_only():
+def test_build_render_payload_applies_density_to_lines_only():
     rng = np.random.default_rng(0)
     solution = rng.normal(size=(200, 3))
     settings = DisplaySettings(
@@ -178,6 +178,11 @@ def test_build_render_payload_disables_density_for_lines_only():
     assert payload.show_points is False
     assert payload.show_lines is True
     assert payload.point_colors is None
+    assert payload.line_colors.shape == (200, 4)
+    assert np.isfinite(payload.line_colors).all()
+    assert payload.projections["x-y"].line_colors.shape == (200, 4)
+    assert payload.projections["x-z"].line_colors.shape == (200, 4)
+    assert payload.projections["y-z"].line_colors.shape == (200, 4)
 
 
 def test_build_render_payload_density_colours_are_rgba():
@@ -192,9 +197,26 @@ def test_build_render_payload_density_colours_are_rgba():
     payload = build_render_payload(solution, settings)
 
     assert payload.point_colors.shape == (120, 4)
+    assert payload.line_colors == (0.93, 0.93, 0.93, 0.38)
     assert np.isfinite(payload.point_colors).all()
     assert payload.point_colors.min() >= 0.0
     assert payload.point_colors.max() <= 1.0
+
+
+def test_build_render_payload_shares_density_colours_for_points_and_lines():
+    rng = np.random.default_rng(2)
+    solution = rng.normal(size=(250, 3))
+    settings = DisplaySettings(
+        display_mode=DISPLAY_MODE_LINES_POINTS,
+        point_budget=120,
+        use_density=True,
+    )
+
+    payload = build_render_payload(solution, settings)
+
+    assert payload.point_colors.shape == (120, 4)
+    assert payload.line_colors.shape == (120, 4)
+    assert np.array_equal(payload.point_colors, payload.line_colors)
 
 
 def test_result_coordinator_ignores_stale_successes_and_keeps_last_good_on_error():
