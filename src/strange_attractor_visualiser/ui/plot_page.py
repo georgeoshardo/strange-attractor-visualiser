@@ -1,6 +1,8 @@
+import time
+
+import numpy as np
 import plotly.express as px
 import streamlit as st
-import numpy as np
 
 from ..attractors.registry import ATTRACTORS
 from ..components.plotly_fast import plotly_fast
@@ -22,6 +24,12 @@ from ..ui.sidebar import (
     select_attractor_ui,
 )
 from ..ui.theme import apply_theme
+
+POINT_BUDGETS = {
+    "Fast (3000)": 3000,
+    "Balanced (6000)": 6000,
+    "Full (8000)": 8000,
+}
 
 
 def init_page():
@@ -45,11 +53,43 @@ def downsample_points(x, y, z, max_points: int):
     return x[indices], y[indices], z[indices]
 
 
+def _step_decimal_places(step: float) -> int:
+    step_text = f"{step:.12f}".rstrip("0")
+    if "." not in step_text:
+        return 0
+
+    return len(step_text.split(".", 1)[1])
+
+
+def param_cache_items(
+    config, param_values: dict[str, float]
+) -> tuple[tuple[str, float], ...]:
+    items = []
+    for param in config.params:
+        decimals = _step_decimal_places(param.step)
+        items.append((param.name, round(float(param_values[param.name]), decimals)))
+
+    return tuple(items)
+
+
+@st.cache_data(max_entries=128, show_spinner=False)
+def solve_attractor_cached(
+    selected_name: str, param_items: tuple[tuple[str, float], ...]
+):
+    config = ATTRACTORS[selected_name]
+    return solve_attractor(config, dict(param_items))
+
+
 def render_plot_page():
     init_page()
 
     simple_mode = st.toggle("SIMPLE UI", key="simple-mode-toggle")
 
+    render_interactive_attractor(simple_mode)
+
+
+@st.fragment
+def render_interactive_attractor(simple_mode: bool):
     if simple_mode:
         st.markdown(
             "<style>[data-testid='stSidebar'] { display: none !important; } </style>",
@@ -69,8 +109,10 @@ def render_plot_page():
         colourscale = None
         animate = False
         display_mode = DISPLAY_MODE_POINTS
+        point_budget = POINT_BUDGETS["Full (8000)"]
+        show_performance = False
     else:
-        controls_section = st.sidebar.container(key="sb-section-controls")
+        controls_section = st.container(key="fragment-section-controls")
         config, selected_name = select_attractor_ui(controls_section)
         show_info = controls_section.toggle(
             "SHOW ATTRACTOR INFO", value=False, key="toggle_attractor_info"
@@ -81,23 +123,33 @@ def render_plot_page():
         if "saved_values" not in st.session_state:
             st.session_state.saved_values = []
 
-        parameter_section = st.sidebar.container(key="sb-section-parameters")
+        parameter_section = st.container(key="fragment-section-parameters")
         parameter_section.markdown("### Parameters")
         param_values = render_parameter_controls(
             config, parameter_section, selected_name
         )
 
-        saved_section = st.sidebar.container(key="sb-section-saved")
+        saved_section = st.container(key="fragment-section-saved")
         render_saved_values_ui(selected_name, saved_section, config, param_values)
 
     if simple_mode:
         st.container(key="simple-equation").markdown(config.equation_text)
 
-    solution = solve_attractor(config, param_values)
+    if not simple_mode:
+        selected_point_budget = st.session_state.get(
+            "point_budget_select", "Full (8000)"
+        )
+        point_budget = POINT_BUDGETS.get(
+            selected_point_budget, POINT_BUDGETS["Full (8000)"]
+        )
+
+    solve_start = time.perf_counter()
+    param_items = param_cache_items(config, param_values)
+    solution = solve_attractor_cached(selected_name, param_items)
+    solve_seconds = time.perf_counter() - solve_start
     x, y, z = solution.T
 
-    MAX_DISPLAY_POINTS = 8000
-    x, y, z = downsample_points(x, y, z, MAX_DISPLAY_POINTS)
+    x, y, z = downsample_points(x, y, z, point_budget)
 
     plot_shell = st.container(key="plot-shell")
 
@@ -121,6 +173,14 @@ def render_plot_page():
             options=DISPLAY_MODES,
             label_visibility="collapsed",
         )
+        display_section.selectbox(
+            "POINT BUDGET",
+            options=list(POINT_BUDGETS.keys()),
+            index=2,
+            key="point_budget_select",
+            label_visibility="collapsed",
+        )
+        show_performance = display_section.toggle("SHOW PERFORMANCE", value=False)
 
         run_section = right_rail.container(key="rp-section-run")
         run_section.markdown("### Run")
@@ -132,13 +192,18 @@ def render_plot_page():
 
         plane_plot = right_rail.container(key="rp-section-plot")
         plane_plot.markdown("### Projections")
+        projection_start = time.perf_counter()
         for img in (
             x_y_plane(x, y, display_mode),
             x_z_plane(x, z, display_mode),
             y_z_plane(y, z, display_mode),
         ):
             plane_plot.image(img, use_container_width=False, width=180)
+        projection_seconds = time.perf_counter() - projection_start
+    else:
+        projection_seconds = 0.0
 
+    render_start = time.perf_counter()
     marker_dict = compute_marker_style(
         x, y, use_density and display_mode != DISPLAY_MODE_LINES, colourscale
     )
@@ -158,6 +223,7 @@ def render_plot_page():
         trace, layout = build_static_data(x, y, z, marker_dict, display_mode)
         with plot_frame:
             plotly_fast(trace, layout, key="main-attractor-plot")
+    render_seconds = time.perf_counter() - render_start
 
     html = '<div class="status-bar">'
     html += '<span class="status-info">'
@@ -172,5 +238,14 @@ def render_plot_page():
             name = k.strip("$")
             params_parts.append("<strong>" + name + ":</strong> " + f"{v:.2f}")
         html += "<span>" + "  ".join(params_parts) + "</span>"
+    if show_performance:
+        html += (
+            "<span><strong>POINTS:</strong> "
+            + str(len(x))
+            + f"  <strong>SOLVE:</strong> {solve_seconds * 1000:.1f} ms"
+            + f"  <strong>PROJ:</strong> {projection_seconds * 1000:.1f} ms"
+            + f"  <strong>RENDER PREP:</strong> {render_seconds * 1000:.1f} ms"
+            + "</span>"
+        )
     html += "</span></div>"
     plot_shell.markdown(html, unsafe_allow_html=True)

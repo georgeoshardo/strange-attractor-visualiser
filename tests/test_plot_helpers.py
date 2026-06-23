@@ -4,7 +4,12 @@ import streamlit as st
 from strange_attractor_visualiser.attractors.registry import ATTRACTORS
 from strange_attractor_visualiser.ui.figure import build_figure, build_static_data
 from strange_attractor_visualiser.ui.plane_figures import _draw_plane_points
-from strange_attractor_visualiser.ui.plot_page import downsample_points
+from strange_attractor_visualiser.ui.plot_page import (
+    POINT_BUDGETS,
+    downsample_points,
+    param_cache_items,
+    render_interactive_attractor,
+)
 from strange_attractor_visualiser.ui.sidebar import _apply_preset, _reset_parameters
 
 
@@ -53,6 +58,53 @@ def test_downsample_points_respects_display_cap():
     assert len(x_plot) == 8_000
     assert len(y_plot) == len(x_plot)
     assert len(z_plot) == len(x_plot)
+
+
+def test_point_budgets_downsample_to_selected_budget():
+    x = list(range(10_000))
+    y = list(range(10_000))
+    z = list(range(10_000))
+
+    x_fast, y_fast, z_fast = downsample_points(
+        x, y, z, max_points=POINT_BUDGETS["Fast (3000)"]
+    )
+    x_full, y_full, z_full = downsample_points(
+        x, y, z, max_points=POINT_BUDGETS["Full (8000)"]
+    )
+
+    assert len(x_fast) == 3_000
+    assert len(y_fast) == len(x_fast)
+    assert len(z_fast) == len(x_fast)
+    assert len(x_full) == 8_000
+    assert len(y_full) == len(x_full)
+    assert len(z_full) == len(x_full)
+
+
+def test_downsample_points_keeps_short_trajectory_unchanged():
+    x = np.arange(100)
+    y = np.arange(100) + 1
+    z = np.arange(100) + 2
+
+    x_plot, y_plot, z_plot = downsample_points(
+        x, y, z, max_points=POINT_BUDGETS["Fast (3000)"]
+    )
+
+    assert x_plot is x
+    assert y_plot is y
+    assert z_plot is z
+
+
+def test_param_cache_items_follow_config_order_and_round_to_step():
+    config = ATTRACTORS["Lorenz"]
+    values = {"$c$": 2.674, "$a$": 10.004, "$b$": 28.006}
+
+    items = param_cache_items(config, values)
+
+    assert items == (("$a$", 10.0), ("$b$", 28.01), ("$c$", 2.67))
+
+
+def test_interactive_renderer_is_fragment_wrapped():
+    assert hasattr(render_interactive_attractor, "__wrapped__")
 
 
 def test_build_static_data_supports_lines_with_points():
