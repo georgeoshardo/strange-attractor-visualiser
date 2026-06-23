@@ -190,11 +190,6 @@ def build_render_payload(
             "x-z": _density_colours(positions[:, 0], positions[:, 2]),
             "y-z": _density_colours(positions[:, 1], positions[:, 2]),
         }
-        if settings.line_interpolation > 1:
-            projection_line_colors = {
-                name: _linear_interpolate(colors, settings.line_interpolation)
-                for name, colors in projection_line_colors.items()
-            }
     projections = {
         "x-y": ProjectionPayload(
             positions[:, 0],
@@ -202,8 +197,8 @@ def build_render_payload(
             projection_show_points,
             projection_show_lines,
             projection_line_colors.get("x-y"),
-            line_positions[:, 0],
-            line_positions[:, 1],
+            positions[:, 0],
+            positions[:, 1],
         ),
         "x-z": ProjectionPayload(
             positions[:, 0],
@@ -211,8 +206,8 @@ def build_render_payload(
             projection_show_points,
             projection_show_lines,
             projection_line_colors.get("x-z"),
-            line_positions[:, 0],
-            line_positions[:, 2],
+            positions[:, 0],
+            positions[:, 2],
         ),
         "y-z": ProjectionPayload(
             positions[:, 1],
@@ -220,8 +215,8 @@ def build_render_payload(
             projection_show_points,
             projection_show_lines,
             projection_line_colors.get("y-z"),
-            line_positions[:, 1],
-            line_positions[:, 2],
+            positions[:, 1],
+            positions[:, 2],
         ),
     }
 

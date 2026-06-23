@@ -209,7 +209,7 @@ def test_build_render_payload_for_lines_with_points():
     assert payload.projections["x-z"].show_lines is True
 
 
-def test_build_render_payload_interpolates_preview_lines_without_adding_points():
+def test_build_render_payload_interpolates_3d_preview_lines_without_adding_points():
     solution = np.array(
         [
             [0.0, 0.0, 0.0],
@@ -230,8 +230,8 @@ def test_build_render_payload_interpolates_preview_lines_without_adding_points()
     assert payload.line_positions.shape == (9, 3)
     assert np.array_equal(payload.line_positions[0], solution[0])
     assert np.array_equal(payload.line_positions[-1], solution[-1])
-    assert payload.projections["x-y"].line_x.shape == (9,)
-    assert payload.projections["x-y"].line_y.shape == (9,)
+    assert payload.projections["x-y"].line_x.shape == (3,)
+    assert payload.projections["x-y"].line_y.shape == (3,)
 
 
 def test_build_render_payload_applies_density_to_lines_only():
@@ -270,7 +270,7 @@ def test_build_render_payload_interpolates_density_line_colours():
     assert payload.point_colors.shape == (40, 4)
     assert payload.line_positions.shape == (118, 3)
     assert payload.line_colors.shape == (118, 4)
-    assert payload.projections["x-z"].line_colors.shape == (118, 4)
+    assert payload.projections["x-z"].line_colors.shape == (40, 4)
 
 
 def test_build_render_payload_density_colours_are_rgba():
