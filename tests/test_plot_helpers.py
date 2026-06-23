@@ -1,6 +1,9 @@
 import numpy as np
 import streamlit as st
+from pathlib import Path
 
+import strange_attractor_visualiser.ui.plot_page as plot_page_module
+import strange_attractor_visualiser.ui.theme as theme_module
 from strange_attractor_visualiser.attractors.registry import ATTRACTORS
 from strange_attractor_visualiser.ui.figure import build_figure, build_static_data
 from strange_attractor_visualiser.ui.plane_figures import _draw_plane_points
@@ -105,6 +108,23 @@ def test_param_cache_items_follow_config_order_and_round_to_step():
 
 def test_interactive_renderer_is_fragment_wrapped():
     assert hasattr(render_interactive_attractor, "__wrapped__")
+
+
+def test_normal_fragment_controls_are_wrapped_in_dedicated_panel():
+    source = Path(plot_page_module.__file__).read_text()
+
+    assert 'key="normal-controls-panel"' in source
+
+
+def test_normal_fragment_layout_reserves_central_plot_area():
+    css = Path(theme_module.__file__).with_name("theme.css").read_text()
+
+    assert ".st-key-normal-controls-panel" in css
+    assert ".stApp:has(.st-key-normal-controls-panel) .st-key-plot-frame" in css
+    assert (
+        "calc(100vw - var(--normal-left-rail-width) - var(--normal-right-rail-width))"
+        in css
+    )
 
 
 def test_build_static_data_supports_lines_with_points():

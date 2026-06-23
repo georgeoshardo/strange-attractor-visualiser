@@ -38,6 +38,9 @@
     --accent-red: #be2424;
     --accent-amber: #bf7f1e;
     --accent-yellow: #fff93c;
+
+    --normal-left-rail-width: clamp(310px, 25vw, 390px);
+    --normal-right-rail-width: 260px;
 }
 
 /* base */
@@ -146,6 +149,109 @@
 
 [data-testid="stSidebar"] .element-container {
     display: contents !important;
+}
+
+/* normal-mode fragment controls */
+.st-key-normal-controls-panel {
+    position: fixed !important;
+    top: 2.2rem !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: var(--normal-left-rail-width) !important;
+    max-width: var(--normal-left-rail-width) !important;
+    z-index: 30 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.65rem !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 0.35rem 0.7rem 0.85rem !important;
+    box-sizing: border-box !important;
+    background: var(--bg-shell) !important;
+    border-right: 1px solid var(--border-primary) !important;
+    scrollbar-width: thin !important;
+}
+
+.st-key-normal-controls-panel>div {
+    width: 100% !important;
+}
+
+.st-key-normal-controls-panel .st-key-fragment-section-controls,
+.st-key-normal-controls-panel .st-key-fragment-section-parameters,
+.st-key-normal-controls-panel .st-key-fragment-section-saved {
+    width: 100% !important;
+    margin: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+.st-key-normal-controls-panel .st-key-fragment-section-controls *,
+.st-key-normal-controls-panel .st-key-fragment-section-parameters *,
+.st-key-normal-controls-panel .st-key-fragment-section-saved * {
+    border-radius: 0 !important;
+}
+
+.st-key-normal-controls-panel .st-key-fragment-section-controls h3,
+.st-key-normal-controls-panel .st-key-fragment-section-parameters h3,
+.st-key-normal-controls-panel .st-key-fragment-section-saved h3 {
+    margin-top: 0.05rem;
+    margin-bottom: 0.2rem;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+}
+
+.st-key-normal-controls-panel p,
+.st-key-normal-controls-panel li,
+.st-key-normal-controls-panel label,
+.st-key-normal-controls-panel .stCaption,
+.st-key-normal-controls-panel [data-testid="stWidgetLabel"],
+.st-key-normal-controls-panel [data-testid="stMarkdownContainer"] {
+    font-size: 0.82rem;
+}
+
+.st-key-normal-controls-panel .stSelectbox,
+.st-key-normal-controls-panel .stSlider,
+.st-key-normal-controls-panel .stToggle,
+.st-key-normal-controls-panel .stButton,
+.st-key-normal-controls-panel .stDownloadButton,
+.st-key-normal-controls-panel .stCheckbox {
+    margin-bottom: 0.25rem !important;
+}
+
+.st-key-normal-controls-panel [data-testid="stCheckbox"] [data-testid="stWidgetLabel"],
+.st-key-normal-controls-panel [data-testid="stCheckbox"] [data-testid="stWidgetLabel"] * {
+    font-size: 0.82rem !important;
+    line-height: 1.8 !important;
+    color: var(--text-primary) !important;
+}
+
+.st-key-normal-controls-panel .stButton>button,
+.st-key-normal-controls-panel .stDownloadButton>button,
+.st-key-normal-controls-panel button[kind]:not([data-testid="stSidebarCollapseButton"]):not([aria-label="Hide sidebar"]):not([aria-label="Show sidebar"]) {
+    width: 100%;
+    min-height: 1.85rem;
+    border: 1px solid var(--border-input);
+    border-radius: 0 !important;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-family: var(--app-font);
+    font-size: 0.78rem;
+    box-shadow: none;
+}
+
+.st-key-normal-controls-panel .stButton>button:hover,
+.st-key-normal-controls-panel .stDownloadButton>button:hover,
+.st-key-normal-controls-panel button[kind]:not([data-testid="stSidebarCollapseButton"]):not([aria-label="Hide sidebar"]):not([aria-label="Show sidebar"]):hover {
+    background: var(--button-hover);
+    color: var(--text-button-hover);
+    border-color: var(--border-bright);
+}
+
+.st-key-normal-controls-panel .st-key-fragment-section-controls [data-testid="stSelectbox"] {
+    margin-top: 0.1rem !important;
 }
 
 [data-testid="stSidebarResizer"] {
@@ -337,20 +443,22 @@ button[aria-label*="sidebar" i]:hover {
 }
 
 .st-key-rp-rail {
-    position: absolute !important;
+    position: fixed !important;
     right: 0 !important;
     top: 0 !important;
-    width: 260px !important;
-    max-width: 260px !important;
+    width: var(--normal-right-rail-width) !important;
+    max-width: var(--normal-right-rail-width) !important;
     height: 100dvh !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: center !important;
     align-items: stretch !important;
     overflow-y: auto !important;
-    z-index: 10 !important;
-    padding-right: 0.6rem;
-    background: transparent !important;
+    z-index: 30 !important;
+    padding: 0 0.6rem 0 0.4rem;
+    box-sizing: border-box !important;
+    background: var(--bg-shell) !important;
+    border-left: 1px solid var(--border-primary) !important;
     font-size: 0.82rem;
 }
 
@@ -460,6 +568,11 @@ h3 {
     background: transparent !important;
     padding: 0 !important;
     z-index: 0 !important;
+}
+
+.stApp:has(.st-key-normal-controls-panel) .st-key-plot-frame {
+    left: var(--normal-left-rail-width) !important;
+    width: calc(100vw - var(--normal-left-rail-width) - var(--normal-right-rail-width)) !important;
 }
 
 .st-key-plot-frame .element-container:has([data-testid="stPlotlyChart"]) {
@@ -574,6 +687,13 @@ h3 {
     flex: 1;
     justify-content: space-evenly;
     gap: 1rem;
+}
+
+.stApp:has(.st-key-normal-controls-panel) .status-bar {
+    left: var(--normal-left-rail-width) !important;
+    right: var(--normal-right-rail-width) !important;
+    width: auto !important;
+    transform: none !important;
 }
 
 .status-bar .status-sep {

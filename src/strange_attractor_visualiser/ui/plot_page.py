@@ -112,7 +112,8 @@ def render_interactive_attractor(simple_mode: bool):
         point_budget = POINT_BUDGETS["Full (8000)"]
         show_performance = False
     else:
-        controls_section = st.container(key="fragment-section-controls")
+        controls_panel = st.container(key="normal-controls-panel")
+        controls_section = controls_panel.container(key="fragment-section-controls")
         config, selected_name = select_attractor_ui(controls_section)
         show_info = controls_section.toggle(
             "SHOW ATTRACTOR INFO", value=False, key="toggle_attractor_info"
@@ -123,13 +124,13 @@ def render_interactive_attractor(simple_mode: bool):
         if "saved_values" not in st.session_state:
             st.session_state.saved_values = []
 
-        parameter_section = st.container(key="fragment-section-parameters")
+        parameter_section = controls_panel.container(key="fragment-section-parameters")
         parameter_section.markdown("### Parameters")
         param_values = render_parameter_controls(
             config, parameter_section, selected_name
         )
 
-        saved_section = st.container(key="fragment-section-saved")
+        saved_section = controls_panel.container(key="fragment-section-saved")
         render_saved_values_ui(selected_name, saved_section, config, param_values)
 
     if simple_mode:
