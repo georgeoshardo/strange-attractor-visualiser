@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
 import numpy as np
-from scipy.stats import gaussian_kde
 
+from ..core.density import binned_density
 from ..core.display import (
     DISPLAY_MODE_LINES,
     DISPLAY_MODE_LINES_POINTS,
@@ -78,15 +78,7 @@ def _density_colours(x: np.ndarray, y: np.ndarray, alpha: float = 0.78) -> np.nd
         colours[:, 3] = alpha
         return colours
 
-    sample_size = min(1000, len(x))
-    indices = np.linspace(0, len(x) - 1, sample_size, dtype=int)
-    kde = gaussian_kde(np.vstack([x[indices], y[indices]]))
-    density = kde(np.vstack([x, y]))
-    density = density - np.min(density)
-    max_density = float(np.max(density))
-    if max_density > 0:
-        density = density / max_density
-
+    density = binned_density(x, y)
     colours = np.empty((len(x), 4), dtype=np.float32)
     colours[:, 0] = density
     colours[:, 1] = 0.35 + 0.55 * (1.0 - density)

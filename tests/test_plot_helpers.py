@@ -162,6 +162,23 @@ def test_live_vertical_slider_uses_default_when_session_value_is_none():
     assert _resolve_slider_default("live-slider", 10.0) == 10.0
 
 
+def test_compute_marker_style_uses_binned_density():
+    x = np.concatenate([np.zeros(50), np.array([10.0])])
+    y = np.concatenate([np.zeros(50), np.array([10.0])])
+
+    marker = sidebar_module.compute_marker_style(
+        x,
+        y,
+        use_density=True,
+        colourscale="Viridis",
+    )
+
+    density = marker["color"]
+    assert density.shape == (51,)
+    assert density[0] > density[-1]
+    assert marker["colorscale"] == "Viridis"
+
+
 def test_build_static_data_supports_lines_with_points():
     values = np.arange(5)
     marker = {"size": 1.25, "color": np.linspace(0, 1, 5), "colorscale": "Viridis"}

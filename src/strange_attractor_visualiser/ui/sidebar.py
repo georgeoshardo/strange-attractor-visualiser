@@ -4,13 +4,13 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import streamlit as st
-from scipy.stats import gaussian_kde
 from streamlit.delta_generator import DeltaGenerator
 
 from ..attractors.registry import (
     ATTRACTORS,
 )
 from ..components.live_vertical_slider import live_vertical_slider
+from ..core.density import binned_density
 from ..core.models import AttractorConfig
 
 
@@ -217,11 +217,7 @@ def compute_marker_style(
     colourscale: str | None,
 ) -> dict[str, Any]:
     if use_density:
-        n = len(x)
-        sample_size = min(1000, n)
-        indices = np.random.choice(n, sample_size, replace=False)
-        kde = gaussian_kde(np.vstack([x[indices], y[indices]]))
-        density = kde(np.vstack([x, y]))
+        density = binned_density(x, y)
         marker_dict = dict(size=1, color=density, colorscale=colourscale)
     else:
         marker_dict = dict(size=1.25)
