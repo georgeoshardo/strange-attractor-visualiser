@@ -6,6 +6,7 @@ import numpy as np
 from strange_attractor_visualiser.attractors.registry import ATTRACTORS
 from strange_attractor_visualiser.desktop.controller import ResultCoordinator
 from strange_attractor_visualiser.desktop.controls import FloatSliderSpec
+from strange_attractor_visualiser.desktop.equations import format_equation_text
 from strange_attractor_visualiser.desktop.render_data import (
     DisplaySettings,
     build_render_payload,
@@ -57,6 +58,24 @@ def test_parameter_cache_key_uses_config_order_and_step_rounding():
     key = parameter_cache_key("Lorenz", config, values)
 
     assert key == ("Lorenz", (("$a$", 10.0), ("$b$", 28.01), ("$c$", 2.67)))
+
+
+def test_format_equation_text_removes_streamlit_latex_for_qt_label():
+    text = format_equation_text(ATTRACTORS["Lorenz"].equation_text)
+
+    assert text.splitlines() == [
+        "ẋ = a(y - x)",
+        "ẏ = x(b - z) - y",
+        "ż = xy - c z",
+    ]
+    assert "$" not in text
+    assert "\\" not in text
+
+
+def test_format_equation_text_handles_common_fraction_markup():
+    text = format_equation_text(ATTRACTORS["Aizawa"].equation_text)
+
+    assert "ż = c + az - (z³)/(3) - (x² + y²)(1 + ez) + fzx³" in text
 
 
 def test_downsample_solution_returns_exact_budget():

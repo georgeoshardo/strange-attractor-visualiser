@@ -11,6 +11,7 @@ from ..core.display import (
 from ..core.solver import get_default_params, solve_attractor
 from .controller import ResultCoordinator
 from .controls import FloatSliderSpec
+from .equations import format_equation_text
 from .render import AttractorView3D, ProjectionView
 from .render_data import DisplaySettings, build_render_payload
 from .state import parameter_cache_key
@@ -447,7 +448,7 @@ class MainWindow:
             parts.append(
                 " ".join(f"{key}: {value:.1f} ms" for key, value in timings.items())
             )
-        self.system_label.setText(config.equation_text.replace("\\\\", "\n"))
+        self.system_label.setText(format_equation_text(config.equation_text))
         self.status_label.setText("\n".join(parts))
 
     def update_info_text(self, *_unused):
