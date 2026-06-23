@@ -66,7 +66,7 @@ class AttractorView3D:
 
         if payload.show_lines:
             self.line.setData(
-                pos=payload.positions,
+                pos=payload.line_positions,
                 color=payload.line_colors,
                 width=1.0,
                 mode="line_strip",
@@ -185,14 +185,18 @@ class ProjectionView:
         show_points: bool,
         show_lines: bool,
         line_colors: np.ndarray | None = None,
+        line_x: np.ndarray | None = None,
+        line_y: np.ndarray | None = None,
     ) -> None:
         if show_lines:
+            line_x = x if line_x is None else line_x
+            line_y = y if line_y is None else line_y
             if line_colors is not None:
                 self.line_item.clear()
-                self.colored_line_item.setData(x, y, line_colors)
+                self.colored_line_item.setData(line_x, line_y, line_colors)
             else:
                 self.colored_line_item.clear()
-                self.line_item.setData(x, y)
+                self.line_item.setData(line_x, line_y)
         else:
             self.line_item.clear()
             self.colored_line_item.clear()

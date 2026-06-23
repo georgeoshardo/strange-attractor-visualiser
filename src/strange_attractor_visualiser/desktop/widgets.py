@@ -43,6 +43,7 @@ FULL_DEBOUNCE_MS = 33
 PREVIEW_DEBOUNCE_MS = 0
 PREVIEW_POINT_BUDGET = 2_500
 PREVIEW_SOLVE_STEPS = 2_500
+PREVIEW_LINE_INTERPOLATION = 4
 SOLVE_MODE_FULL = "full"
 SOLVE_MODE_PREVIEW = "preview"
 
@@ -410,7 +411,11 @@ class MainWindow:
             use_density=self.density_toggle.isChecked(),
         )
         if preview:
-            return preview_display_settings(settings, PREVIEW_POINT_BUDGET)
+            return preview_display_settings(
+                settings,
+                PREVIEW_POINT_BUDGET,
+                line_interpolation=PREVIEW_LINE_INTERPOLATION,
+            )
         return settings
 
     def current_solver_settings(self) -> SolverSettings:
@@ -575,6 +580,8 @@ class MainWindow:
                 projection.show_points,
                 projection.show_lines,
                 projection.line_colors,
+                projection.line_x,
+                projection.line_y,
             )
 
     def update_status(self, *_unused):

@@ -128,6 +128,23 @@ def test_preview_display_settings_keeps_smaller_existing_budget_and_density():
     assert preview.use_density is True
 
 
+def test_preview_display_settings_enables_line_interpolation():
+    settings = DisplaySettings(
+        display_mode=DISPLAY_MODE_LINES,
+        point_budget=None,
+        use_density=True,
+    )
+
+    preview = preview_display_settings(
+        settings,
+        point_budget=2500,
+        line_interpolation=4,
+    )
+
+    assert settings.line_interpolation == 1
+    assert preview.line_interpolation == 4
+
+
 def test_format_equation_text_removes_streamlit_latex_for_qt_label():
     text = format_equation_text(ATTRACTORS["Lorenz"].equation_text)
 
@@ -192,6 +209,31 @@ def test_build_render_payload_for_lines_with_points():
     assert payload.projections["x-z"].show_lines is True
 
 
+def test_build_render_payload_interpolates_preview_lines_without_adding_points():
+    solution = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [2.0, 0.0, 0.0],
+        ]
+    )
+    settings = DisplaySettings(
+        display_mode=DISPLAY_MODE_LINES_POINTS,
+        point_budget=None,
+        use_density=False,
+        line_interpolation=4,
+    )
+
+    payload = build_render_payload(solution, settings)
+
+    assert payload.positions.shape == (3, 3)
+    assert payload.line_positions.shape == (9, 3)
+    assert np.array_equal(payload.line_positions[0], solution[0])
+    assert np.array_equal(payload.line_positions[-1], solution[-1])
+    assert payload.projections["x-y"].line_x.shape == (9,)
+    assert payload.projections["x-y"].line_y.shape == (9,)
+
+
 def test_build_render_payload_applies_density_to_lines_only():
     rng = np.random.default_rng(0)
     solution = rng.normal(size=(200, 3))
@@ -211,6 +253,24 @@ def test_build_render_payload_applies_density_to_lines_only():
     assert payload.projections["x-y"].line_colors.shape == (200, 4)
     assert payload.projections["x-z"].line_colors.shape == (200, 4)
     assert payload.projections["y-z"].line_colors.shape == (200, 4)
+
+
+def test_build_render_payload_interpolates_density_line_colours():
+    rng = np.random.default_rng(3)
+    solution = rng.normal(size=(40, 3))
+    settings = DisplaySettings(
+        display_mode=DISPLAY_MODE_LINES_POINTS,
+        point_budget=None,
+        use_density=True,
+        line_interpolation=3,
+    )
+
+    payload = build_render_payload(solution, settings)
+
+    assert payload.point_colors.shape == (40, 4)
+    assert payload.line_positions.shape == (118, 3)
+    assert payload.line_colors.shape == (118, 4)
+    assert payload.projections["x-z"].line_colors.shape == (118, 4)
 
 
 def test_build_render_payload_density_colours_are_rgba():

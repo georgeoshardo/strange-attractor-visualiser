@@ -50,6 +50,7 @@ def test_desktop_main_window_uses_preview_solves_during_slider_drag():
 
     from strange_attractor_visualiser.desktop.widgets import (
         PREVIEW_DEBOUNCE_MS,
+        PREVIEW_LINE_INTERPOLATION,
         SOLVE_MODE_FULL,
         SOLVE_MODE_PREVIEW,
         MainWindow,
@@ -67,6 +68,10 @@ def test_desktop_main_window_uses_preview_solves_during_slider_drag():
     assert window.queued_solve_mode == SOLVE_MODE_PREVIEW
     assert window.solve_timer.interval() == PREVIEW_DEBOUNCE_MS
     assert window.current_settings(preview=True).use_density is True
+    assert (
+        window.current_settings(preview=True).line_interpolation
+        == PREVIEW_LINE_INTERPOLATION
+    )
 
     window.slider_drag_finished()
 
