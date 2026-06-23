@@ -1,7 +1,7 @@
 import numpy as np
 import os
 
-from .render_data import RenderPayload
+from .render_data import RenderPayload, ViewBounds
 
 
 class AttractorView3D:
@@ -51,6 +51,7 @@ class AttractorView3D:
         if self._headless:
             return
 
+        self._fit_camera(payload.view_bounds)
         empty = np.empty((0, 3), dtype=np.float32)
         if payload.show_points and payload.point_colors is not None:
             self.scatter.setData(
@@ -75,6 +76,26 @@ class AttractorView3D:
         else:
             self.line.setData(pos=empty)
             self.line.setVisible(False)
+
+    def _fit_camera(self, bounds: ViewBounds) -> None:
+        from pyqtgraph import Vector
+
+        center = bounds.center
+        self.view.setCameraPosition(
+            pos=Vector(float(center[0]), float(center[1]), float(center[2])),
+            distance=float(bounds.camera_distance),
+        )
+        self.grid.setSize(x=float(bounds.grid_size), y=float(bounds.grid_size))
+        self.grid.setSpacing(
+            x=float(bounds.grid_spacing),
+            y=float(bounds.grid_spacing),
+        )
+        self.grid.resetTransform()
+        self.grid.translate(
+            float(center[0]),
+            float(center[1]),
+            float(bounds.minimum[2]),
+        )
 
 
 class ProjectionView:

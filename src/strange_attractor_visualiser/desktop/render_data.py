@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import math
 
 import numpy as np
 
@@ -9,6 +10,10 @@ from ..core.display import (
     DISPLAY_MODE_POINTS,
 )
 
+CAMERA_DISTANCE_SCALE = 2.2
+GRID_PADDING = 1.25
+MIN_VIEW_SPAN = 1.0
+
 
 @dataclass(frozen=True)
 class DisplaySettings:
@@ -16,6 +21,17 @@ class DisplaySettings:
     point_budget: int | None = 30_000
     use_density: bool = False
     line_interpolation: int = 1
+
+
+@dataclass(frozen=True)
+class ViewBounds:
+    minimum: np.ndarray
+    maximum: np.ndarray
+    center: np.ndarray
+    span: np.ndarray
+    camera_distance: float
+    grid_size: float
+    grid_spacing: float
 
 
 @dataclass(frozen=True)
@@ -33,6 +49,7 @@ class ProjectionPayload:
 class RenderPayload:
     positions: np.ndarray
     line_positions: np.ndarray
+    view_bounds: ViewBounds
     show_points: bool
     show_lines: bool
     point_colors: np.ndarray | None
@@ -45,6 +62,53 @@ def downsample_solution(solution: np.ndarray, point_budget: int | None) -> np.nd
         return solution
     indices = np.linspace(0, len(solution) - 1, point_budget, dtype=int)
     return solution[indices]
+
+
+def _nice_grid_spacing(raw_spacing: float) -> float:
+    if raw_spacing <= 0.0 or not math.isfinite(raw_spacing):
+        return 1.0
+
+    exponent = math.floor(math.log10(raw_spacing))
+    base = 10.0**exponent
+    fraction = raw_spacing / base
+    if fraction <= 1.0:
+        nice_fraction = 1.0
+    elif fraction <= 2.0:
+        nice_fraction = 2.0
+    elif fraction <= 5.0:
+        nice_fraction = 5.0
+    else:
+        nice_fraction = 10.0
+    return nice_fraction * base
+
+
+def calculate_view_bounds(positions: np.ndarray) -> ViewBounds:
+    positions = np.asarray(positions, dtype=np.float32)
+    if positions.size == 0:
+        finite_positions = np.empty((0, 3), dtype=np.float32)
+    else:
+        finite_positions = positions[np.isfinite(positions).all(axis=1)]
+
+    if len(finite_positions) == 0:
+        minimum = np.zeros(3, dtype=np.float32)
+        maximum = np.zeros(3, dtype=np.float32)
+    else:
+        minimum = finite_positions.min(axis=0)
+        maximum = finite_positions.max(axis=0)
+
+    center = (minimum + maximum) * 0.5
+    span = maximum - minimum
+    effective_span = max(float(np.max(span)), MIN_VIEW_SPAN)
+    grid_size = effective_span * GRID_PADDING
+    return ViewBounds(
+        minimum=minimum,
+        maximum=maximum,
+        center=center,
+        span=span,
+        camera_distance=effective_span * CAMERA_DISTANCE_SCALE,
+        grid_size=grid_size,
+        grid_spacing=_nice_grid_spacing(grid_size / 12.0),
+    )
 
 
 def preview_display_settings(
@@ -146,6 +210,7 @@ def _linear_interpolate(values: np.ndarray, factor: int) -> np.ndarray:
 def build_render_payload(
     solution: np.ndarray, settings: DisplaySettings
 ) -> RenderPayload:
+    view_bounds = calculate_view_bounds(solution)
     sampled = downsample_solution(solution, settings.point_budget)
     positions = np.asarray(sampled, dtype=np.float32)
     show_points, show_lines = _mode_visibility(settings.display_mode)
@@ -223,6 +288,7 @@ def build_render_payload(
     return RenderPayload(
         positions=positions,
         line_positions=line_positions,
+        view_bounds=view_bounds,
         show_points=show_points,
         show_lines=show_lines,
         point_colors=point_colors,

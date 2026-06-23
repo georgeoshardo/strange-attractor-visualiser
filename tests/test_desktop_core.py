@@ -10,6 +10,7 @@ from strange_attractor_visualiser.desktop.equations import format_equation_text
 from strange_attractor_visualiser.desktop.render_data import (
     DisplaySettings,
     build_render_payload,
+    calculate_view_bounds,
     downsample_solution,
     preview_display_settings,
 )
@@ -171,6 +172,47 @@ def test_downsample_solution_returns_exact_budget():
     assert sampled.shape == (3_000, 3)
     assert np.array_equal(sampled[0], solution[0])
     assert np.array_equal(sampled[-1], solution[-1])
+
+
+def test_calculate_view_bounds_centres_camera_on_finite_curve_extent():
+    positions = np.array(
+        [
+            [10.0, -2.0, 5.0],
+            [14.0, 4.0, 11.0],
+            [np.nan, 99.0, 99.0],
+        ]
+    )
+
+    bounds = calculate_view_bounds(positions)
+
+    assert np.allclose(bounds.minimum, [10.0, -2.0, 5.0])
+    assert np.allclose(bounds.maximum, [14.0, 4.0, 11.0])
+    assert np.allclose(bounds.center, [12.0, 1.0, 8.0])
+    assert np.allclose(bounds.span, [4.0, 6.0, 6.0])
+    assert bounds.camera_distance > 6.0
+    assert bounds.grid_size > 6.0
+    assert bounds.grid_spacing > 0.0
+
+
+def test_build_render_payload_bounds_use_full_curve_before_downsampling():
+    solution = np.array(
+        [
+            [0.0, 0.0, 0.0],
+            [500.0, 0.0, 0.0],
+            [1.0, 1.0, 1.0],
+            [2.0, 2.0, 2.0],
+        ]
+    )
+    settings = DisplaySettings(
+        display_mode=DISPLAY_MODE_POINTS,
+        point_budget=2,
+        use_density=False,
+    )
+
+    payload = build_render_payload(solution, settings)
+
+    assert payload.positions.shape == (2, 3)
+    assert np.allclose(payload.view_bounds.maximum, [500.0, 2.0, 2.0])
 
 
 def test_build_render_payload_for_points_only():
