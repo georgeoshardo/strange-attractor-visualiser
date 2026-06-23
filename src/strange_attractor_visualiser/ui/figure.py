@@ -2,6 +2,13 @@ import numpy as np
 import plotly.colors as pcolors
 import plotly.graph_objects as go
 
+from ..core.display import (
+    DISPLAY_MODE_LINES,
+    DISPLAY_MODE_LINES_POINTS,
+    DISPLAY_MODE_POINTS,
+    DISPLAY_MODES,
+)
+
 _PLOT_THEME = {
     "font": "#999999",
     "axis_title": "rgba(120, 120, 120, 0.8)",
@@ -20,10 +27,6 @@ _PLOT_THEME = {
 }
 
 _EXT = 5
-DISPLAY_MODE_POINTS = "Points only"
-DISPLAY_MODE_LINES = "Lines only"
-DISPLAY_MODE_LINES_POINTS = "Lines + points"
-DISPLAY_MODES = (DISPLAY_MODE_POINTS, DISPLAY_MODE_LINES, DISPLAY_MODE_LINES_POINTS)
 
 
 def _display_mode_parts(display_mode: str) -> tuple[str, bool, bool]:

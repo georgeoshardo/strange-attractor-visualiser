@@ -15,10 +15,18 @@ dependencies = [
   "matplotlib",
 ]
 [project.optional-dependencies]
+desktop = [
+  "PySide6>=6.7",
+  "pyqtgraph>=0.13.7",
+  "PyOpenGL>=3.1",
+]
 dev = [
   "pytest>=8",
   "pytest-mock>=3.14",
 ]
+
+[project.scripts]
+strange-attractor-qt = "strange_attractor_visualiser.desktop.app:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
