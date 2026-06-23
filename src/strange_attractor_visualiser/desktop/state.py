@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
+from ..core.display import DISPLAY_MODE_POINTS
 from ..core.models import AttractorConfig
-from ..ui.figure import DISPLAY_MODE_POINTS
 
 
 def _decimal_places(step: float) -> int:
