@@ -100,3 +100,26 @@ def test_projection_view_accepts_density_coloured_lines():
     assert projection.colored_line_item.picture is not None
     projection.widget.close()
     app.processEvents()
+
+
+def test_desktop_main_window_exposes_solver_controls():
+    from PySide6 import QtWidgets
+
+    from strange_attractor_visualiser.core.solver import SOLVER_LSODA, SOLVER_RK4
+    from strange_attractor_visualiser.desktop.widgets import MainWindow
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    window = MainWindow()
+    window.solve_timer.stop()
+
+    assert window.integrator_combo.currentText() == SOLVER_LSODA
+    assert window.current_solver_settings().method == SOLVER_LSODA
+    assert window.current_solver_settings().lsoda_rtol is not None
+
+    window.integrator_combo.setCurrentText(SOLVER_RK4)
+
+    assert window.current_solver_settings().method == SOLVER_RK4
+    assert not window.lsoda_tolerance_combo.isEnabled()
+    assert window.solve_timer.isActive()
+    window.window.close()
+    app.processEvents()

@@ -19,7 +19,13 @@ from strange_attractor_visualiser.core.display import (
     DISPLAY_MODE_LINES_POINTS,
     DISPLAY_MODE_POINTS,
 )
-from strange_attractor_visualiser.core.solver import get_default_params, solve_attractor
+from strange_attractor_visualiser.core.solver import (
+    SOLVER_LSODA,
+    SOLVER_RK4,
+    SolverSettings,
+    get_default_params,
+    solve_attractor,
+)
 
 
 def test_pyproject_defines_desktop_extra_and_qt_entrypoint():
@@ -60,6 +66,28 @@ def test_parameter_cache_key_uses_config_order_and_step_rounding():
     key = parameter_cache_key("Lorenz", config, values)
 
     assert key == ("Lorenz", (("$a$", 10.0), ("$b$", 28.01), ("$c$", 2.67)))
+
+
+def test_parameter_cache_key_includes_solver_settings_when_supplied():
+    config = ATTRACTORS["Lorenz"]
+    values = get_default_params(config)
+
+    lsoda_key = parameter_cache_key(
+        "Lorenz",
+        config,
+        values,
+        SolverSettings(method=SOLVER_LSODA, lsoda_rtol=1e-6, lsoda_atol=1e-8),
+    )
+    rk4_key = parameter_cache_key(
+        "Lorenz",
+        config,
+        values,
+        SolverSettings(method=SOLVER_RK4),
+    )
+
+    assert lsoda_key != rk4_key
+    assert lsoda_key[-1] == ("solver", ("LSODA", 1e-06, 1e-08))
+    assert rk4_key[-1] == ("solver", ("RK4", None, None))
 
 
 def test_solve_attractor_accepts_step_count_override():

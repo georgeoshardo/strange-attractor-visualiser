@@ -8,7 +8,13 @@ from ..core.display import (
     DISPLAY_MODE_LINES_POINTS,
     DISPLAY_MODE_POINTS,
 )
-from ..core.solver import get_default_params, solve_attractor
+from ..core.solver import (
+    SOLVER_LSODA,
+    SOLVER_RK4,
+    SolverSettings,
+    get_default_params,
+    solve_attractor,
+)
 from .controller import ResultCoordinator
 from .controls import FloatSliderSpec
 from .equations import format_equation_text
@@ -25,6 +31,13 @@ POINT_BUDGETS = {
     "Balanced (30000)": 30_000,
     "Full source": None,
 }
+LSODA_TOLERANCES = {
+    "Strict (1e-8 / 1e-10)": (1e-8, 1e-10),
+    "Balanced (1e-6 / 1e-8)": (1e-6, 1e-8),
+    "Fast (1e-5 / 1e-7)": (1e-5, 1e-7),
+    "Very fast (1e-4 / 1e-6)": (1e-4, 1e-6),
+}
+DEFAULT_LSODA_TOLERANCE = "Balanced (1e-6 / 1e-8)"
 CACHE_MAX_ENTRIES = 128
 FULL_DEBOUNCE_MS = 33
 PREVIEW_DEBOUNCE_MS = 0
@@ -152,6 +165,7 @@ class SolveWorker:
         settings: DisplaySettings,
         cached_solution,
         solve_steps: int | None,
+        solver_settings: SolverSettings,
         preview: bool,
     ):
         from PySide6 import QtCore
@@ -168,9 +182,19 @@ class SolveWorker:
                     solution = cached_solution
                     cache_key = None
                     if not preview:
-                        cache_key = parameter_cache_key(selected_name, config, param_values)
+                        cache_key = parameter_cache_key(
+                            selected_name,
+                            config,
+                            param_values,
+                            solver_settings,
+                        )
                     if solution is None:
-                        solution = solve_attractor(config, param_values, n_steps=solve_steps)
+                        solution = solve_attractor(
+                            config,
+                            param_values,
+                            n_steps=solve_steps,
+                            solver_settings=solver_settings,
+                        )
                     solve_ms = (time.perf_counter() - solve_start) * 1000
 
                     render_start = time.perf_counter()
@@ -325,6 +349,19 @@ class MainWindow:
         self.point_budget_combo.currentTextChanged.connect(self.schedule_solve)
         layout.addWidget(self.point_budget_combo)
 
+        layout.addWidget(QtWidgets.QLabel("Integrator"))
+        self.integrator_combo = QtWidgets.QComboBox()
+        self.integrator_combo.addItems([SOLVER_LSODA, SOLVER_RK4])
+        self.integrator_combo.currentTextChanged.connect(self.integrator_changed)
+        layout.addWidget(self.integrator_combo)
+
+        layout.addWidget(QtWidgets.QLabel("LSODA tolerance"))
+        self.lsoda_tolerance_combo = QtWidgets.QComboBox()
+        self.lsoda_tolerance_combo.addItems(list(LSODA_TOLERANCES.keys()))
+        self.lsoda_tolerance_combo.setCurrentText(DEFAULT_LSODA_TOLERANCE)
+        self.lsoda_tolerance_combo.currentTextChanged.connect(self.schedule_solve)
+        layout.addWidget(self.lsoda_tolerance_combo)
+
         self.performance_toggle = QtWidgets.QCheckBox("Show performance")
         self.performance_toggle.toggled.connect(self.update_status)
         layout.addWidget(self.performance_toggle)
@@ -375,6 +412,23 @@ class MainWindow:
         if preview:
             return preview_display_settings(settings, PREVIEW_POINT_BUDGET)
         return settings
+
+    def current_solver_settings(self) -> SolverSettings:
+        method = self.integrator_combo.currentText()
+        if method == SOLVER_RK4:
+            return SolverSettings(method=SOLVER_RK4)
+        rtol, atol = LSODA_TOLERANCES[self.lsoda_tolerance_combo.currentText()]
+        return SolverSettings(
+            method=SOLVER_LSODA,
+            lsoda_rtol=rtol,
+            lsoda_atol=atol,
+        )
+
+    def integrator_changed(self, *_unused) -> None:
+        self.lsoda_tolerance_combo.setEnabled(
+            self.integrator_combo.currentText() == SOLVER_LSODA
+        )
+        self.schedule_solve()
 
     def rebuild_parameter_sliders(self):
         from PySide6 import QtWidgets
@@ -453,9 +507,15 @@ class MainWindow:
         selected_name = self.selected_name
         config = ATTRACTORS[selected_name]
         param_values = dict(self.param_values)
+        solver_settings = self.current_solver_settings()
         cached_solution = None
         if not preview:
-            cache_key = parameter_cache_key(selected_name, config, param_values)
+            cache_key = parameter_cache_key(
+                selected_name,
+                config,
+                param_values,
+                solver_settings,
+            )
             cached_solution = self.solution_cache.get(cache_key)
             if cached_solution is not None:
                 self.solution_cache.move_to_end(cache_key)
@@ -467,6 +527,7 @@ class MainWindow:
             self.current_settings(preview=preview),
             cached_solution,
             PREVIEW_SOLVE_STEPS if preview else None,
+            solver_settings,
             preview,
         )
         worker.signals.finished.connect(self.solve_finished)
@@ -534,6 +595,11 @@ class MainWindow:
             parts.append(
                 " ".join(f"{key}: {value:.1f} ms" for key, value in timings.items())
             )
+        solver_settings = self.current_solver_settings()
+        if solver_settings.method == SOLVER_RK4:
+            parts.append("Integrator: RK4")
+        else:
+            parts.append(f"Integrator: LSODA {self.lsoda_tolerance_combo.currentText()}")
         self.system_label.setText(format_equation_text(config.equation_text))
         self.status_label.setText("\n".join(parts))
 
