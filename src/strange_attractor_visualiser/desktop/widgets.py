@@ -4,6 +4,8 @@ import time
 
 from ..attractors.registry import ATTRACTORS
 from ..core.display import (
+    DEFAULT_DISPLAY_MODE,
+    DEFAULT_USE_DENSITY,
     DISPLAY_MODE_LINES,
     DISPLAY_MODE_LINES_POINTS,
     DISPLAY_MODE_POINTS,
@@ -334,6 +336,7 @@ class MainWindow:
 
         layout.addWidget(QtWidgets.QLabel("Display"))
         self.density_toggle = QtWidgets.QCheckBox("Use density colouring")
+        self.density_toggle.setChecked(DEFAULT_USE_DENSITY)
         self.density_toggle.toggled.connect(self.schedule_solve)
         layout.addWidget(self.density_toggle)
 
@@ -341,6 +344,7 @@ class MainWindow:
         self.display_mode_combo.addItems(
             [DISPLAY_MODE_POINTS, DISPLAY_MODE_LINES, DISPLAY_MODE_LINES_POINTS]
         )
+        self.display_mode_combo.setCurrentText(DEFAULT_DISPLAY_MODE)
         self.display_mode_combo.currentTextChanged.connect(self.schedule_solve)
         layout.addWidget(self.display_mode_combo)
 

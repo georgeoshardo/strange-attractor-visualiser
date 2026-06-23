@@ -131,6 +131,13 @@ def test_normal_fragment_layout_reserves_central_plot_area():
     )
 
 
+def test_normal_streamlit_display_defaults_to_lines_with_density():
+    source = Path(plot_page_module.__file__).read_text()
+
+    assert '"USE DENSITY COLOURING (SLOWER PERFORMANCE)", value=DEFAULT_USE_DENSITY' in source
+    assert "index=DISPLAY_MODES.index(DEFAULT_DISPLAY_MODE)" in source
+
+
 def test_parameter_controls_use_local_live_slider_component():
     source = Path(sidebar_module.__file__).read_text()
 

@@ -5,9 +5,10 @@ import numpy as np
 
 from ..core.density import binned_density
 from ..core.display import (
+    DEFAULT_DISPLAY_MODE,
+    DEFAULT_USE_DENSITY,
     DISPLAY_MODE_LINES,
     DISPLAY_MODE_LINES_POINTS,
-    DISPLAY_MODE_POINTS,
 )
 
 CAMERA_DISTANCE_SCALE = 2.2
@@ -17,9 +18,9 @@ MIN_VIEW_SPAN = 1.0
 
 @dataclass(frozen=True)
 class DisplaySettings:
-    display_mode: str = DISPLAY_MODE_POINTS
+    display_mode: str = DEFAULT_DISPLAY_MODE
     point_budget: int | None = 30_000
-    use_density: bool = False
+    use_density: bool = DEFAULT_USE_DENSITY
     line_interpolation: int = 1
 
 

@@ -14,6 +14,7 @@ from strange_attractor_visualiser.desktop.render_data import (
     downsample_solution,
     preview_display_settings,
 )
+from strange_attractor_visualiser.desktop.state import DesktopState
 from strange_attractor_visualiser.desktop.state import parameter_cache_key
 from strange_attractor_visualiser.core.display import (
     DISPLAY_MODE_LINES,
@@ -89,6 +90,16 @@ def test_parameter_cache_key_includes_solver_settings_when_supplied():
     assert lsoda_key != rk4_key
     assert lsoda_key[-1] == ("solver", ("LSODA", 1e-06, 1e-08))
     assert rk4_key[-1] == ("solver", ("RK4", None, None))
+
+
+def test_desktop_display_defaults_to_lines_with_density():
+    state = DesktopState(selected_name="Lorenz", param_values={})
+    settings = DisplaySettings()
+
+    assert state.display_mode == DISPLAY_MODE_LINES
+    assert state.use_density is True
+    assert settings.display_mode == DISPLAY_MODE_LINES
+    assert settings.use_density is True
 
 
 def test_solve_attractor_accepts_step_count_override():

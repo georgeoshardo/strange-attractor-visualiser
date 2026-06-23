@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from ..core.display import DISPLAY_MODE_POINTS
+from ..core.display import DEFAULT_DISPLAY_MODE, DEFAULT_USE_DENSITY
 from ..core.models import AttractorConfig
 from ..core.solver import SolverSettings
 
@@ -31,8 +31,8 @@ def parameter_cache_key(
 class DesktopState:
     selected_name: str
     param_values: dict[str, float]
-    display_mode: str = DISPLAY_MODE_POINTS
+    display_mode: str = DEFAULT_DISPLAY_MODE
     point_budget: int | None = 30_000
-    use_density: bool = False
+    use_density: bool = DEFAULT_USE_DENSITY
     animate: bool = False
     saved_values: list[dict] = field(default_factory=list)

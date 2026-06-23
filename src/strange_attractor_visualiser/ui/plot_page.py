@@ -6,6 +6,7 @@ import streamlit as st
 
 from ..attractors.registry import ATTRACTORS
 from ..components.plotly_fast import plotly_fast
+from ..core.display import DEFAULT_DISPLAY_MODE, DEFAULT_USE_DENSITY
 from ..core.solver import solve_attractor
 from ..ui.figure import (
     DISPLAY_MODE_LINES,
@@ -160,7 +161,7 @@ def render_interactive_attractor(simple_mode: bool):
         display_section = right_rail.container(key="rp-section-display")
         display_section.markdown("### Display")
         use_density = display_section.toggle(
-            "USE DENSITY COLOURING (SLOWER PERFORMANCE)", value=False
+            "USE DENSITY COLOURING (SLOWER PERFORMANCE)", value=DEFAULT_USE_DENSITY
         )
 
         colourscale_list = px.colors.named_colorscales()
@@ -172,6 +173,7 @@ def render_interactive_attractor(simple_mode: bool):
         display_mode = display_section.selectbox(
             "DISPLAY MODE",
             options=DISPLAY_MODES,
+            index=DISPLAY_MODES.index(DEFAULT_DISPLAY_MODE),
             label_visibility="collapsed",
         )
         display_section.selectbox(

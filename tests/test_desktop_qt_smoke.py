@@ -45,6 +45,24 @@ def test_desktop_main_window_schedules_solve_on_slider_change():
     app.processEvents()
 
 
+def test_desktop_main_window_defaults_to_lines_with_density():
+    from PySide6 import QtWidgets
+
+    from strange_attractor_visualiser.core.display import DISPLAY_MODE_LINES
+    from strange_attractor_visualiser.desktop.widgets import MainWindow
+
+    app = QtWidgets.QApplication.instance() or QtWidgets.QApplication([])
+    window = MainWindow()
+    window.solve_timer.stop()
+
+    assert window.display_mode_combo.currentText() == DISPLAY_MODE_LINES
+    assert window.density_toggle.isChecked()
+    assert window.current_settings().display_mode == DISPLAY_MODE_LINES
+    assert window.current_settings().use_density is True
+    window.window.close()
+    app.processEvents()
+
+
 def test_desktop_main_window_uses_preview_solves_during_slider_drag():
     from PySide6 import QtWidgets
 
