@@ -3,8 +3,12 @@ import streamlit as st
 from pathlib import Path
 
 import strange_attractor_visualiser.ui.plot_page as plot_page_module
+import strange_attractor_visualiser.ui.sidebar as sidebar_module
 import strange_attractor_visualiser.ui.theme as theme_module
 from strange_attractor_visualiser.attractors.registry import ATTRACTORS
+from strange_attractor_visualiser.components.live_vertical_slider import (
+    _resolve_slider_default,
+)
 from strange_attractor_visualiser.ui.figure import build_figure, build_static_data
 from strange_attractor_visualiser.ui.plane_figures import _draw_plane_points
 from strange_attractor_visualiser.ui.plot_page import (
@@ -125,6 +129,37 @@ def test_normal_fragment_layout_reserves_central_plot_area():
         "calc(100vw - var(--normal-left-rail-width) - var(--normal-right-rail-width))"
         in css
     )
+
+
+def test_parameter_controls_use_local_live_slider_component():
+    source = Path(sidebar_module.__file__).read_text()
+
+    assert "from ..components.live_vertical_slider import live_vertical_slider" in source
+    assert "streamlit_vertical_slider" not in source
+
+
+def test_live_vertical_slider_frontend_emits_during_drag():
+    component_html = (
+        Path(sidebar_module.__file__).parents[1]
+        / "components"
+        / "live_vertical_slider"
+        / "frontend"
+        / "index.html"
+    )
+    html = component_html.read_text()
+
+    input_handler = html[html.index('addEventListener("input"') :]
+    assert "Streamlit.setComponentValue" in input_handler
+    assert "emitValue" in input_handler
+    assert "requestAnimationFrame" in html
+    assert 'dataType: "json"' in html
+
+
+def test_live_vertical_slider_uses_default_when_session_value_is_none():
+    st.session_state.clear()
+    st.session_state["live-slider"] = None
+
+    assert _resolve_slider_default("live-slider", 10.0) == 10.0
 
 
 def test_build_static_data_supports_lines_with_points():

@@ -6,11 +6,11 @@ import pandas as pd
 import streamlit as st
 from scipy.stats import gaussian_kde
 from streamlit.delta_generator import DeltaGenerator
-from streamlit_vertical_slider import vertical_slider
 
 from ..attractors.registry import (
     ATTRACTORS,
 )
+from ..components.live_vertical_slider import live_vertical_slider
 from ..core.models import AttractorConfig
 
 
@@ -60,7 +60,7 @@ def render_parameter_controls(
     cols = config_container.columns(n)
     for i, param in enumerate(config.params):
         with cols[i]:
-            value = vertical_slider(
+            value = live_vertical_slider(
                 key=f"{selected_name}_{param.name}_v{version}",
                 width=35,
                 height=160,
