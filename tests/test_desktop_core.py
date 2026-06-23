@@ -359,6 +359,21 @@ def test_build_render_payload_applies_density_to_lines_only():
     assert payload.projections["y-z"].line_colors.shape == (200, 4)
 
 
+def test_projection_density_lines_use_lower_alpha_than_main_line():
+    rng = np.random.default_rng(4)
+    solution = rng.normal(size=(200, 3))
+    settings = DisplaySettings(
+        display_mode=DISPLAY_MODE_LINES,
+        point_budget=None,
+        use_density=True,
+    )
+
+    payload = build_render_payload(solution, settings)
+
+    assert np.all(payload.line_colors[:, 3] > payload.projections["x-y"].line_colors[:, 3])
+    assert np.allclose(payload.projections["x-y"].line_colors[:, 3], 0.22)
+
+
 def test_build_render_payload_interpolates_density_line_colours():
     rng = np.random.default_rng(3)
     solution = rng.normal(size=(40, 3))

@@ -15,6 +15,7 @@ CAMERA_DISTANCE_SCALE = 2.2
 GRID_PADDING = 1.25
 MIN_VIEW_SPAN = 1.0
 MAX_RENDER_COORD = 1_000_000.0
+PROJECTION_DENSITY_ALPHA = 0.22
 
 
 @dataclass(frozen=True)
@@ -260,9 +261,21 @@ def build_render_payload(
     projection_line_colors = {}
     if projection_show_lines and settings.use_density:
         projection_line_colors = {
-            "x-y": density_colors,
-            "x-z": _density_colours(positions[:, 0], positions[:, 2]),
-            "y-z": _density_colours(positions[:, 1], positions[:, 2]),
+            "x-y": _density_colours(
+                positions[:, 0],
+                positions[:, 1],
+                alpha=PROJECTION_DENSITY_ALPHA,
+            ),
+            "x-z": _density_colours(
+                positions[:, 0],
+                positions[:, 2],
+                alpha=PROJECTION_DENSITY_ALPHA,
+            ),
+            "y-z": _density_colours(
+                positions[:, 1],
+                positions[:, 2],
+                alpha=PROJECTION_DENSITY_ALPHA,
+            ),
         }
     projections = {
         "x-y": ProjectionPayload(
